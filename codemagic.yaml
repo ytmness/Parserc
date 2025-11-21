@@ -1,0 +1,22 @@
+
+workflows:
+  ios:
+    name: iOS build
+    max_build_duration: 120
+    platform: macos
+    sdk: iphoneos
+    build:
+      ios:
+        xcode: '13.4'
+        scheme: OpenParsec
+        build_configuration: Release
+        export_method: app-store # o ad-hoc, development según tu caso
+    test:
+      ios:
+        xcode: '13.4'
+        scheme: OpenParsec
+    publish:
+      scripts:
+        - name: Export .ipa file
+          script: |
+            xcodebuild -exportArchive -archivePath $CM_BUILD_DIR/Build/Products/Release-iphoneos/OpenParsec.xcarchive -exportOptionsPlist exportOptions.plist -exportPath $CM_BUILD_DIR/
