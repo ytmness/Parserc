@@ -10,6 +10,6 @@ workflows:
           if [ -f Podfile ]; then pod install; fi
       - name: Build Project
         script: |
-          xcodebuild -workspace "project.xcworkspace" -scheme "OpenParsec" -configuration Release -sdk iphoneos
+          xcodebuild -workspace "OpenParsec-main/project.xcworkspace" -scheme "OpenParsec" -configuration Release -sdk iphoneos
     artifacts:
       - build/ios/ipa/*.ipa
