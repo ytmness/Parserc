@@ -6,8 +6,10 @@ workflows:
     environment:
       xcode: latest
       ios_signing:
-        distribution_type: development
-        bundle_identifier: com.tuempresakeko.OpenParsec
+        distribution_type: ad_hoc  # O 'app_store' o 'development', dependiendo de lo que necesites
+        bundle_identifier: com.kekoparsec.openparsec  # Cambia esto al bundle identifier de tu app
+        certificate_reference: Abardibu  # El nombre del certificado que subiste
+        provisioning_profile_reference: Abardibu  # El nombre del perfil de provisión que subiste
     scripts:
       - name: Install CocoaPods
         script: |
