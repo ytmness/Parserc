@@ -4,6 +4,9 @@ workflows:
     max_build_duration: 120
     environment:
       xcode: latest
+      ios_signing:
+        distribution_type: development  # O 'ad_hoc', 'app_store'
+        bundle_identifier: com.kekoparsec.openparsec  # Cambia esto al Bundle Identifier real de tu app
     scripts:
       - name: Install CocoaPods
         script: |
@@ -12,3 +15,4 @@ workflows:
         script: |
           xcodebuild -project "OpenParsec-main/OpenParsec.xcodeproj" -scheme "OpenParsec" -configuration Release -sdk iphoneos
     artifacts:
+      - build/ios/ipa/*.ipa
