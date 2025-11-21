@@ -6,7 +6,7 @@ workflows:
     environment:
       xcode: latest
       ios_signing:
-        distribution_type: developmentkeko
+        distribution_type: development
         bundle_identifier: com.tuempresakeko.OpenParsec
     scripts:
       - name: Install CocoaPods
