@@ -4,9 +4,6 @@ workflows:
     max_build_duration: 120
     environment:
       xcode: latest
-      ios_signing:
-        distribution_type: development  # O 'ad_hoc', 'app_store'
-        bundle_identifier: com.aigch.OpenParsec1  # Reemplaza con tu Bundle Identifier real
     scripts:
       - name: Install CocoaPods
         script: |
