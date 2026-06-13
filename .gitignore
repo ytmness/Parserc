@@ -28,3 +28,6 @@ Temporary Items
 
 ## User settings
 xcuserdata/
+
+## Codemagic / credenciales locales
+.local/

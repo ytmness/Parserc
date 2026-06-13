@@ -1,15 +1,164 @@
+# Parcec (OpenParsec) — Codemagic iOS nativo (Swift)
+# IMPORTANTE: al iniciar build, elige workflow YAML "iOS → TestFlight (manual)"
+# NO uses "Default Workflow" del editor UI.
+
+definitions:
+  env_common: &env_common
+    xcode: latest
+    vars:
+      BUNDLE_ID: com.aigch.OpenParsec1
+      XCODE_PROJECT: OpenParsec.xcodeproj
+      XCODE_SCHEME: OpenParsec
+      APP_STORE_APPLE_ID: "6780047101"
+
+  ios_scripts: &ios_scripts
+    - name: Repositorio — submódulos (ParsecSDK)
+      script: |
+        set -e
+        git submodule update --init --recursive
+        test -d Frameworks/ParsecSDK.framework || {
+          echo "ERROR: Frameworks/ParsecSDK.framework no encontrado tras init del submódulo"
+          exit 1
+        }
+    - name: iOS — analyze
+      script: |
+        set -e
+        xcodebuild analyze \
+          -project "$XCODE_PROJECT" \
+          -scheme "$XCODE_SCHEME" \
+          -configuration Release \
+          -destination 'generic/platform=iOS' \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty || exit ${PIPESTATUS[0]}
+    - name: iOS — code signing
+      script: |
+        set -e
+        xcode-project use-profiles
+    - name: iOS — build number TestFlight
+      script: |
+        set -e
+        if [ -z "${APP_STORE_APPLE_ID:-}" ]; then
+          echo "Sin APP_STORE_APPLE_ID: se usa build del proyecto (1.0.0+1)"
+          exit 0
+        fi
+        LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+        agvtool new-version -all $(($LATEST + 1))
+    - name: iOS — compilar IPA
+      script: |
+        set -e
+        xcode-project build-ipa \
+          --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+          --scheme "$XCODE_SCHEME"
+        echo "=== Contenido build/ios/ipa ==="
+        find build/ios/ipa -ls 2>/dev/null || find build -name '*.ipa' -ls
+        IPA=$(find build/ios/ipa -name '*.ipa' -print -quit 2>/dev/null)
+        if [ -z "$IPA" ]; then IPA=$(find build -name '*.ipa' -print -quit); fi
+        if [ -z "$IPA" ]; then echo "ERROR: no se encontro IPA"; exit 1; fi
+        echo "IPA: $IPA"
+        mkdir -p "$CM_BUILD_DIR/artifacts/ios"
+        cp "$IPA" "$CM_BUILD_DIR/artifacts/ios/app.ipa"
+        ls -la "$CM_BUILD_DIR/artifacts/ios/"
+    - name: iOS — subir a App Store Connect
+      script: |
+        set -e
+        IPA="$CM_BUILD_DIR/artifacts/ios/app.ipa"
+        test -f "$IPA"
+        echo "Subiendo $IPA ($(du -h "$IPA" | cut -f1)) app=$APP_STORE_APPLE_ID"
+        # Solo subir el binario; TestFlight se activa en App Store Connect
+        # (cumplimiento de exportacion + datos de prueba beta).
+        app-store-connect publish \
+          --path "$IPA" \
+          --apple-id "$APP_STORE_APPLE_ID"
+
 workflows:
-  ios_build:
-    name: iOS Build – OpenParsec
-    max_build_duration: 120
+  ios-testflight:
+    name: iOS → TestFlight
+    max_build_duration: 75
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: PARSEC
     environment:
-      xcode: latest
+      <<: *env_common
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.aigch.OpenParsec1
+      groups:
+        - parcec
+    cache:
+      cache_paths:
+        - $HOME/Library/Developer/Xcode/DerivedData
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+    when:
+      changeset:
+        includes:
+          - 'OpenParsec/'
+          - 'OpenParsec.xcodeproj/'
+          - 'Frameworks/'
+          - 'codemagic.yaml'
+    scripts: *ios_scripts
+    artifacts:
+      - artifacts/ios/app.ipa
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+
+  ios-testflight-manual:
+    name: iOS → TestFlight (manual)
+    max_build_duration: 75
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: PARSEC
+    environment:
+      <<: *env_common
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.aigch.OpenParsec1
+      groups:
+        - parcec
+    scripts: *ios_scripts
+    artifacts:
+      - artifacts/ios/app.ipa
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+
+  ios-adhoc-manual:
+    name: iOS → IPA ad hoc (manual)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      <<: *env_common
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: com.aigch.OpenParsec1
+      groups:
+        - parcec
     scripts:
-      - name: Install CocoaPods
+      - name: Repositorio — submódulos (ParsecSDK)
         script: |
-          if [ -f Podfile ]; then pod install; fi
-      - name: Build Project
+          set -e
+          git submodule update --init --recursive
+          test -d Frameworks/ParsecSDK.framework
+      - name: iOS — code signing
+        script: xcode-project use-profiles
+      - name: iOS — compilar IPA ad hoc
         script: |
-          xcodebuild -workspace "OpenParsec-main/project.xcworkspace" -scheme "OpenParsec" -configuration Release -sdk iphoneos
+          set -e
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
