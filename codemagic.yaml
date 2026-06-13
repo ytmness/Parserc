@@ -26,11 +26,12 @@ definitions:
     - name: Repositorio — submódulos (ParsecSDK)
       script: |
         set -e
-        git submodule update --init --recursive
-        test -d Frameworks/ParsecSDK.framework || {
-          echo "ERROR: Frameworks/ParsecSDK.framework no encontrado tras init del submódulo"
-          exit 1
-        }
+        git submodule sync --recursive
+        git submodule update --init --recursive --depth 1
+        FW="Frameworks/ParsecSDK.framework"
+        test -d "$FW" || { echo "ERROR: $FW no encontrado"; exit 1; }
+        test -f "$FW/ParsecSDK" || { echo "ERROR: binario ParsecSDK ausente"; ls -laR "$FW"; exit 1; }
+        echo "ParsecSDK OK: $(du -h "$FW/ParsecSDK" | cut -f1)"
     - name: iOS — analyze
       script: |
         set -e
@@ -46,6 +47,12 @@ definitions:
         set -e
         xcode-project use-profiles \
           --project "$CM_BUILD_DIR/$XCODE_PROJECT"
+        FW="Frameworks/ParsecSDK.framework"
+        if [ -n "${CM_CERTIFICATE_NAME:-}" ] && [ -f "$FW/ParsecSDK" ]; then
+          echo "Firmando $FW con $CM_CERTIFICATE_NAME"
+          codesign --force --sign "$CM_CERTIFICATE_NAME" --timestamp=none "$FW"
+          codesign -vv "$FW"
+        fi
     - name: iOS — build number TestFlight
       script: |
         set -e
@@ -56,7 +63,8 @@ definitions:
         set -e
         xcode-project build-ipa \
           --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
-          --scheme "$XCODE_SCHEME"
+          --scheme "$XCODE_SCHEME" \
+          --archive-flags="-destination 'generic/platform=iOS'"
         echo "=== Contenido build/ios/ipa ==="
         find build/ios/ipa -ls 2>/dev/null || find build -name '*.ipa' -ls
         IPA=$(find build/ios/ipa -name '*.ipa' -print -quit 2>/dev/null)
