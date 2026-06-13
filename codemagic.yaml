@@ -45,26 +45,56 @@ definitions:
     - name: iOS — code signing
       script: |
         set -e
-        xcode-project use-profiles \
-          --project "$CM_BUILD_DIR/$XCODE_PROJECT"
+        keychain initialize
+        keychain add-certificates
+        cd "$CM_BUILD_DIR"
+        xcode-project use-profiles --project OpenParsec.xcodeproj
+        echo "=== Signing (Release) ==="
+        xcodebuild -project OpenParsec.xcodeproj -scheme OpenParsec -configuration Release \
+          -destination 'generic/platform=iOS' -showBuildSettings 2>/dev/null \
+          | grep -iE 'PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN|PROVISIONING|DEVELOPMENT_TEAM' || true
         FW="Frameworks/ParsecSDK.framework"
         if [ -n "${CM_CERTIFICATE_NAME:-}" ] && [ -f "$FW/ParsecSDK" ]; then
           echo "Firmando $FW con $CM_CERTIFICATE_NAME"
           codesign --force --sign "$CM_CERTIFICATE_NAME" --timestamp=none "$FW"
           codesign -vv "$FW"
+        else
+          echo "WARN: CM_CERTIFICATE_NAME no definido"
         fi
     - name: iOS — build number TestFlight
       script: |
         set -e
+        cd "$CM_BUILD_DIR"
         LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
         agvtool new-version -all $(($LATEST + 1))
     - name: iOS — compilar IPA
       script: |
         set -e
-        xcode-project build-ipa \
-          --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
-          --scheme "$XCODE_SCHEME" \
-          --archive-flags="-destination 'generic/platform=iOS'"
+        cd "$CM_BUILD_DIR"
+        mkdir -p build/ios/ipa build/ios/xcarchive
+        ARCHIVE="build/ios/xcarchive/OpenParsec.xcarchive"
+        set +e
+        xcodebuild \
+          -project OpenParsec.xcodeproj \
+          -scheme OpenParsec \
+          -configuration Release \
+          -destination 'generic/platform=iOS' \
+          -archivePath "$ARCHIVE" \
+          archive \
+          COMPILER_INDEX_STORE_ENABLE=NO \
+          2>&1 | tee /tmp/xcode-archive.log
+        ARCHIVE_EXIT=${PIPESTATUS[0]}
+        set -e
+        if [ "$ARCHIVE_EXIT" -ne 0 ]; then
+          echo "=== ERRORES ARCHIVE (ultimas 100 lineas) ==="
+          tail -100 /tmp/xcode-archive.log
+          grep -iE 'error:|failed|provision|sign' /tmp/xcode-archive.log | tail -30 || true
+          exit "$ARCHIVE_EXIT"
+        fi
+        xcodebuild -exportArchive \
+          -archivePath "$ARCHIVE" \
+          -exportPath build/ios/ipa \
+          -exportOptionsPlist /Users/builder/export_options.plist
         echo "=== Contenido build/ios/ipa ==="
         find build/ios/ipa -ls 2>/dev/null || find build -name '*.ipa' -ls
         IPA=$(find build/ios/ipa -name '*.ipa' -print -quit 2>/dev/null)
@@ -114,6 +144,7 @@ workflows:
     artifacts:
       - artifacts/ios/app.ipa
       - build/ios/ipa/*.ipa
+      - /tmp/xcode-archive.log
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
@@ -132,6 +163,7 @@ workflows:
     artifacts:
       - artifacts/ios/app.ipa
       - build/ios/ipa/*.ipa
+      - /tmp/xcode-archive.log
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
