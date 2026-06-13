@@ -35,7 +35,7 @@ definitions:
       script: |
         set -e
         if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
-          echo "ERROR: Falta CERTIFICATE_PRIVATE_KEY en el grupo parcec (Codemagic → Environment variables → Secret)"
+          echo "ERROR: Falta CERTIFICATE_PRIVATE_KEY (Codemagic → Application environment variables → Secret)"
           echo "Ver docs/CODEMAGIC.md seccion Certificado de distribucion"
           exit 1
         fi
@@ -93,8 +93,6 @@ workflows:
       app_store_connect: PARSEC
     environment:
       <<: *env_common
-      groups:
-        - parcec
     cache:
       cache_paths:
         - $HOME/Library/Developer/Xcode/DerivedData
@@ -130,8 +128,6 @@ workflows:
       app_store_connect: PARSEC
     environment:
       <<: *env_common
-      groups:
-        - parcec
     scripts: *ios_scripts
     artifacts:
       - artifacts/ios/app.ipa
@@ -150,8 +146,6 @@ workflows:
       app_store_connect: PARSEC
     environment:
       <<: *env_common
-      groups:
-        - parcec
     scripts:
       - name: Repositorio — submódulos (ParsecSDK)
         script: |
@@ -162,7 +156,7 @@ workflows:
         script: |
           set -e
           if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
-            echo "ERROR: Falta CERTIFICATE_PRIVATE_KEY en grupo parcec"
+            echo "ERROR: Falta CERTIFICATE_PRIVATE_KEY en Application environment variables"
             exit 1
           fi
           keychain initialize
