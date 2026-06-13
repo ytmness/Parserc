@@ -2,9 +2,9 @@
 #
 # FIRMA (obligatorio ANTES del primer build):
 #   Team settings → Code signing identities
-#   1. iOS certificates → Generate certificate (Apple Distribution)
-#   2. iOS provisioning profiles → Fetch from Developer Portal
-#      → App Store → com.aigch.OpenParsec1
+#   1. iOS certificates → Generate certificate → reference: parsec_distribution
+#   2. iOS provisioning profiles → reference: parsec_appstore (ya descargado)
+#      Bundle: com.aigch.OpenParsec1.757NQ675N5
 #
 # IMPORTANTE: workflow "iOS → TestFlight (manual)" — NO Default Workflow.
 
@@ -12,10 +12,12 @@ definitions:
   env_common: &env_common
     xcode: latest
     ios_signing:
-      distribution_type: app_store
-      bundle_identifier: com.aigch.OpenParsec1
+      provisioning_profiles:
+        - profile: parsec_appstore
+      certificates:
+        - certificate: parsec_distribution
     vars:
-      BUNDLE_ID: com.aigch.OpenParsec1
+      BUNDLE_ID: com.aigch.OpenParsec1.757NQ675N5
       XCODE_PROJECT: OpenParsec.xcodeproj
       XCODE_SCHEME: OpenParsec
       APP_STORE_APPLE_ID: "6780047101"
@@ -137,8 +139,10 @@ workflows:
     environment:
       <<: *env_common
       ios_signing:
-        distribution_type: ad_hoc
-        bundle_identifier: com.aigch.OpenParsec1
+        provisioning_profiles:
+          - profile: parsec_appstore
+        certificates:
+          - certificate: parsec_distribution
     scripts:
       - name: Repositorio — submódulos (ParsecSDK)
         script: |
