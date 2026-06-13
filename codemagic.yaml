@@ -82,14 +82,18 @@ definitions:
         set -e
         cd "$CM_BUILD_DIR"
         # TestFlight solo cuenta builds aceptados; App Store Connect cuenta todos los uploads (incluso rechazados)
-        TF=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
-        ASC=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+        TF=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+        ASC=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+        TF=$(echo "${TF:-0}" | tr -dc '0-9')
+        ASC=$(echo "${ASC:-0}" | tr -dc '0-9')
+        TF=${TF:-0}
+        ASC=${ASC:-0}
         LATEST=$TF
         if [ "$ASC" -gt "$LATEST" ]; then LATEST=$ASC; fi
         NEXT=$(($LATEST + 1))
         echo "Build number: ultimo=$LATEST (TF=$TF ASC=$ASC) -> nuevo=$NEXT"
         agvtool new-version -all "$NEXT"
-        agvtool what-version -all
+        echo "CFBundleVersion en proyecto: $(agvtool what-version -terse)"
     - name: iOS — compilar IPA
       script: |
         set -e
