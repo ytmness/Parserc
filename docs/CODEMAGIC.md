@@ -122,7 +122,7 @@ Para IPA firmada necesitas certificados locales o usar Codemagic.
 |-------|----------|
 | `integration PARSEC not found` | El nombre en Team integrations debe ser exactamente `PARSEC` |
 | `Variable group parcec not found` | Crea al menos una variable en grupo `parcec` |
-| `No matching profiles for bundle` | En Team settings → Code signing → Fetch profiles, o deja que el yaml cree perfiles con `fetch-signing-files --create`. Verifica App ID `com.aigch.OpenParsec1` en developer.apple.com |
+| `No matching profiles for bundle` | **Causa:** bloque `ios_signing` en yaml sin perfiles en Team settings. **Solución:** el yaml actual usa `fetch-signing-files --create` en scripts (sin `ios_signing`). Si persiste, crea App ID en developer.apple.com y verifica integración `PARSEC` con rol Admin |
 | `ParsecSDK.framework no encontrado` | `git submodule update --init --recursive` y commit del submódulo |
 | `Scheme OpenParsec not found` | Usa workflow YAML, no Default Workflow |
 | `APP_STORE_APPLE_ID` vacío | OK en primer build; añádelo después para auto-incrementar build |

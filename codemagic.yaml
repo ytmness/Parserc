@@ -1,6 +1,7 @@
-# Parcec (OpenParsec) — Codemagic iOS nativo (Swift)
-# IMPORTANTE: al iniciar build, elige workflow YAML "iOS → TestFlight (manual)"
-# NO uses "Default Workflow" del editor UI.
+# ParsecMobile (OpenParsec) — Codemagic iOS nativo (Swift)
+# Firma: fetch-signing-files --create (NO usar ios_signing en environment;
+# ese bloque exige perfiles pre-subidos en Team settings y falla al iniciar).
+# IMPORTANTE: workflow "iOS → TestFlight (manual)" — NO Default Workflow.
 
 definitions:
   env_common: &env_common
@@ -41,7 +42,8 @@ definitions:
     - name: iOS — code signing
       script: |
         set -e
-        xcode-project use-profiles
+        xcode-project use-profiles \
+          --project "$CM_BUILD_DIR/$XCODE_PROJECT"
     - name: iOS — build number TestFlight
       script: |
         set -e
@@ -72,8 +74,6 @@ definitions:
         IPA="$CM_BUILD_DIR/artifacts/ios/app.ipa"
         test -f "$IPA"
         echo "Subiendo $IPA ($(du -h "$IPA" | cut -f1)) app=$APP_STORE_APPLE_ID"
-        # Solo subir el binario; TestFlight se activa en App Store Connect
-        # (cumplimiento de exportacion + datos de prueba beta).
         app-store-connect publish \
           --path "$IPA" \
           --apple-id "$APP_STORE_APPLE_ID"
@@ -87,9 +87,6 @@ workflows:
       app_store_connect: PARSEC
     environment:
       <<: *env_common
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.aigch.OpenParsec1
       groups:
         - parcec
     cache:
@@ -127,9 +124,6 @@ workflows:
       app_store_connect: PARSEC
     environment:
       <<: *env_common
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.aigch.OpenParsec1
       groups:
         - parcec
     scripts: *ios_scripts
@@ -146,11 +140,10 @@ workflows:
     name: iOS → IPA ad hoc (manual)
     max_build_duration: 60
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: PARSEC
     environment:
       <<: *env_common
-      ios_signing:
-        distribution_type: ad_hoc
-        bundle_identifier: com.aigch.OpenParsec1
       groups:
         - parcec
     scripts:
@@ -168,7 +161,9 @@ workflows:
             --create \
             --strict-match-identifier
       - name: iOS — code signing
-        script: xcode-project use-profiles
+        script: |
+          xcode-project use-profiles \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT"
       - name: iOS — compilar IPA ad hoc
         script: |
           set -e
