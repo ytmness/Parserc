@@ -1,11 +1,19 @@
 # ParsecMobile (OpenParsec) — Codemagic iOS nativo (Swift)
-# Firma: fetch-signing-files --create (NO usar ios_signing en environment;
-# ese bloque exige perfiles pre-subidos en Team settings y falla al iniciar).
+#
+# FIRMA (obligatorio ANTES del primer build):
+#   Team settings → Code signing identities
+#   1. iOS certificates → Generate certificate (Apple Distribution)
+#   2. iOS provisioning profiles → Fetch from Developer Portal
+#      → App Store → com.aigch.OpenParsec1
+#
 # IMPORTANTE: workflow "iOS → TestFlight (manual)" — NO Default Workflow.
 
 definitions:
   env_common: &env_common
     xcode: latest
+    ios_signing:
+      distribution_type: app_store
+      bundle_identifier: com.aigch.OpenParsec1
     vars:
       BUNDLE_ID: com.aigch.OpenParsec1
       XCODE_PROJECT: OpenParsec.xcodeproj
@@ -31,20 +39,6 @@ definitions:
           -destination 'generic/platform=iOS' \
           CODE_SIGNING_ALLOWED=NO \
           | xcpretty || exit ${PIPESTATUS[0]}
-    - name: iOS — certificados y perfiles (App Store)
-      script: |
-        set -e
-        if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
-          echo "ERROR: Falta CERTIFICATE_PRIVATE_KEY (Codemagic → Application environment variables → Secret)"
-          echo "Ver docs/CODEMAGIC.md seccion Certificado de distribucion"
-          exit 1
-        fi
-        keychain initialize
-        app-store-connect fetch-signing-files "$BUNDLE_ID" \
-          --type IOS_APP_STORE \
-          --create \
-          --strict-match-identifier \
-          --certificate-key=@env:CERTIFICATE_PRIVATE_KEY
     - name: iOS — code signing
       script: |
         set -e
@@ -53,10 +47,6 @@ definitions:
     - name: iOS — build number TestFlight
       script: |
         set -e
-        if [ -z "${APP_STORE_APPLE_ID:-}" ]; then
-          echo "Sin APP_STORE_APPLE_ID: se usa build del proyecto (1.0.0+1)"
-          exit 0
-        fi
         LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
         agvtool new-version -all $(($LATEST + 1))
     - name: iOS — compilar IPA
@@ -146,25 +136,15 @@ workflows:
       app_store_connect: PARSEC
     environment:
       <<: *env_common
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: com.aigch.OpenParsec1
     scripts:
       - name: Repositorio — submódulos (ParsecSDK)
         script: |
           set -e
           git submodule update --init --recursive
           test -d Frameworks/ParsecSDK.framework
-      - name: iOS — certificados y perfiles (ad hoc)
-        script: |
-          set -e
-          if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
-            echo "ERROR: Falta CERTIFICATE_PRIVATE_KEY en Application environment variables"
-            exit 1
-          fi
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_ADHOC \
-            --create \
-            --strict-match-identifier \
-            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY
       - name: iOS — code signing
         script: |
           xcode-project use-profiles \
