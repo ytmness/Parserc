@@ -149,7 +149,8 @@ Para IPA firmada necesitas certificados locales o usar Codemagic.
 | `ParsecSDK.framework no encontrado` | `git submodule update --init --recursive` y commit del submódulo |
 | `Scheme OpenParsec not found` | Usa workflow YAML, no Default Workflow |
 | `APP_STORE_APPLE_ID` vacío | OK en primer build; añádelo después para auto-incrementar build |
-| Analyze falla en Windows | Normal: analyze requiere Mac / Xcode |
+| Upload ASC error 90087 x86_64 | El script `lipo -thin arm64` en ParsecSDK elimina arquitectura simulador |
+| Upload ASC error 90125 encryption | Suele resolverse al quitar x86_64 y re-firmar ParsecSDK |
 
 ---
 

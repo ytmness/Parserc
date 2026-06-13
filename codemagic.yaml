@@ -32,6 +32,18 @@ definitions:
         test -d "$FW" || { echo "ERROR: $FW no encontrado"; exit 1; }
         test -f "$FW/ParsecSDK" || { echo "ERROR: binario ParsecSDK ausente"; ls -laR "$FW"; exit 1; }
         echo "ParsecSDK OK: $(du -h "$FW/ParsecSDK" | cut -f1)"
+        echo "Arquitecturas antes: $(lipo -info "$FW/ParsecSDK")"
+        # App Store: solo arm64 dispositivo (rechaza x86_64 / simulador en el framework)
+        if lipo -info "$FW/ParsecSDK" | grep -q x86_64; then
+          if lipo -info "$FW/ParsecSDK" | grep -q arm64; then
+            lipo -thin arm64 "$FW/ParsecSDK" -output "$FW/ParsecSDK.thin"
+            mv "$FW/ParsecSDK.thin" "$FW/ParsecSDK"
+          else
+            echo "ERROR: ParsecSDK solo tiene x86_64 (simulador). Necesitas SDK con arm64."
+            exit 1
+          fi
+        fi
+        echo "Arquitecturas despues: $(lipo -info "$FW/ParsecSDK")"
     - name: iOS — analyze
       script: |
         set -e
@@ -58,6 +70,7 @@ definitions:
           echo "Firmando $FW con $CM_CERTIFICATE_NAME"
           codesign --force --sign "$CM_CERTIFICATE_NAME" --timestamp=none "$FW"
           codesign -vv "$FW"
+          echo "Arquitectura final embebida: $(lipo -info "$FW/ParsecSDK")"
         else
           echo "WARN: CM_CERTIFICATE_NAME no definido"
         fi
