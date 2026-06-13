@@ -21,6 +21,7 @@ definitions:
       XCODE_PROJECT: OpenParsec.xcodeproj
       XCODE_SCHEME: OpenParsec
       APP_STORE_APPLE_ID: "6780047101"
+      MARKETING_VERSION: "1.0.0"
 
   ios_scripts: &ios_scripts
     - name: Repositorio — submódulos (ParsecSDK)
@@ -81,17 +82,18 @@ definitions:
       script: |
         set -e
         cd "$CM_BUILD_DIR"
-        # TestFlight solo cuenta builds aceptados; App Store Connect cuenta todos los uploads (incluso rechazados)
-        TF=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
-        ASC=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
-        TF=$(echo "${TF:-0}" | tr -dc '0-9')
-        ASC=$(echo "${ASC:-0}" | tr -dc '0-9')
-        TF=${TF:-0}
-        ASC=${ASC:-0}
-        LATEST=$TF
-        if [ "$ASC" -gt "$LATEST" ]; then LATEST=$ASC; fi
+        to_int() { echo "${1:-0}" | tr -dc '0-9'; }
+        LOCAL=$(to_int "$(agvtool what-version -terse 2>/dev/null || echo 0)")
+        LOCAL=${LOCAL:-0}
+        # Incluye builds en procesamiento/rechazados para la version de marketing actual
+        REMOTE=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID" \
+          --version-string "$MARKETING_VERSION" 2>/dev/null || true)
+        REMOTE=$(to_int "$REMOTE")
+        REMOTE=${REMOTE:-0}
+        LATEST=$LOCAL
+        if [ "$REMOTE" -gt "$LATEST" ]; then LATEST=$REMOTE; fi
         NEXT=$(($LATEST + 1))
-        echo "Build number: ultimo=$LATEST (TF=$TF ASC=$ASC) -> nuevo=$NEXT"
+        echo "Build number: ultimo=$LATEST (local=$LOCAL remoto=$REMOTE version=$MARKETING_VERSION) -> nuevo=$NEXT"
         agvtool new-version -all "$NEXT"
         echo "CFBundleVersion en proyecto: $(agvtool what-version -terse)"
     - name: iOS — compilar IPA
