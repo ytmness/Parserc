@@ -30,6 +30,14 @@ definitions:
           -destination 'generic/platform=iOS' \
           CODE_SIGNING_ALLOWED=NO \
           | xcpretty || exit ${PIPESTATUS[0]}
+    - name: iOS — certificados y perfiles (App Store)
+      script: |
+        set -e
+        keychain initialize
+        app-store-connect fetch-signing-files "$BUNDLE_ID" \
+          --type IOS_APP_STORE \
+          --create \
+          --strict-match-identifier
     - name: iOS — code signing
       script: |
         set -e
@@ -151,6 +159,14 @@ workflows:
           set -e
           git submodule update --init --recursive
           test -d Frameworks/ParsecSDK.framework
+      - name: iOS — certificados y perfiles (ad hoc)
+        script: |
+          set -e
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_ADHOC \
+            --create \
+            --strict-match-identifier
       - name: iOS — code signing
         script: xcode-project use-profiles
       - name: iOS — compilar IPA ad hoc
