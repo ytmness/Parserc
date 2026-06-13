@@ -151,6 +151,7 @@ Para IPA firmada necesitas certificados locales o usar Codemagic.
 | `APP_STORE_APPLE_ID` vacío | OK en primer build; añádelo después para auto-incrementar build |
 | Upload ASC error 90087 x86_64 | El script `lipo -thin arm64` en ParsecSDK elimina arquitectura simulador |
 | Upload ASC error 90125 encryption | Suele resolverse al quitar x86_64 y re-firmar ParsecSDK |
+| ITMS-90208 MinimumOSVersion | ParsecSDK tenia 9.3; el CI lo sube a 14.0 para coincidir con la app |
 
 ---
 

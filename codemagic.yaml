@@ -44,6 +44,9 @@ definitions:
           fi
         fi
         echo "Arquitecturas despues: $(lipo -info "$FW/ParsecSDK")"
+        # ITMS-90208: MinimumOSVersion del framework debe >= minimo de la app (14.0)
+        /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 14.0" "$FW/Info.plist"
+        echo "ParsecSDK MinimumOSVersion: $(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$FW/Info.plist")"
     - name: iOS — analyze
       script: |
         set -e
