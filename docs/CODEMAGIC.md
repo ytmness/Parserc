@@ -43,9 +43,32 @@ En tu app → **Environment variables**:
 
 | Variable | Secret | Valor | Obligatorio |
 |----------|--------|-------|-------------|
-| `APP_STORE_APPLE_ID` | ✓ | Número Apple ID de la app (App Store Connect → App Information) | No al primer build |
+| `APP_STORE_APPLE_ID` | ✓ | `6780047101` | Recomendado (auto build number) |
+| `CERTIFICATE_PRIVATE_KEY` | ✓ | Clave RSA privada (ver abajo) | **Sí** para firmar |
 
-Al crear la variable, **group name:** `parcec` (crear grupo nuevo con ese nombre).
+Al crear cada variable, **group name:** `parcec`.
+
+#### Certificado de distribución (`CERTIFICATE_PRIVATE_KEY`)
+
+Codemagic necesita la **clave privada RSA** para crear o reutilizar el certificado Apple Distribution. La API key `.p8` (PARSEC) **no basta**.
+
+**Opción A — clave ya generada en tu PC** (`.local/ios_distribution_private_key`):
+
+1. Abre el archivo con un editor de texto
+2. Copia **todo**, incluyendo `-----BEGIN RSA PRIVATE KEY-----` y `-----END RSA PRIVATE KEY-----`
+3. Codemagic → Environment variables → **Add**
+4. Name: `CERTIFICATE_PRIVATE_KEY` | Secret: ✓ | Group: `parcec` | Paste → Save
+
+**Opción B — generar clave nueva** (PowerShell):
+
+```powershell
+ssh-keygen -t rsa -b 2048 -m PEM -f ios_distribution_private_key -q -N '""'
+Get-Content ios_distribution_private_key | Set-Clipboard
+```
+
+Pega el contenido en Codemagic como `CERTIFICATE_PRIVATE_KEY` (Secret, grupo `parcec`).
+
+> La primera vez que el build corre con `--create`, Apple crea un certificado **Apple Distribution** ligado a esta clave. No subas la clave privada a GitHub.
 
 ### 4. App Store Connect
 
@@ -122,7 +145,7 @@ Para IPA firmada necesitas certificados locales o usar Codemagic.
 |-------|----------|
 | `integration PARSEC not found` | El nombre en Team integrations debe ser exactamente `PARSEC` |
 | `Variable group parcec not found` | Crea al menos una variable en grupo `parcec` |
-| `No matching profiles for bundle` | **Causa:** bloque `ios_signing` en yaml sin perfiles en Team settings. **Solución:** el yaml actual usa `fetch-signing-files --create` en scripts (sin `ios_signing`). Si persiste, crea App ID en developer.apple.com y verifica integración `PARSEC` con rol Admin |
+| `Cannot save Signing Certificates without certificate private key` | Añade `CERTIFICATE_PRIVATE_KEY` (Secret) al grupo `parcec` — clave RSA completa con BEGIN/END |
 | `ParsecSDK.framework no encontrado` | `git submodule update --init --recursive` y commit del submódulo |
 | `Scheme OpenParsec not found` | Usa workflow YAML, no Default Workflow |
 | `APP_STORE_APPLE_ID` vacío | OK en primer build; añádelo después para auto-incrementar build |

@@ -34,11 +34,17 @@ definitions:
     - name: iOS — certificados y perfiles (App Store)
       script: |
         set -e
+        if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+          echo "ERROR: Falta CERTIFICATE_PRIVATE_KEY en el grupo parcec (Codemagic → Environment variables → Secret)"
+          echo "Ver docs/CODEMAGIC.md seccion Certificado de distribucion"
+          exit 1
+        fi
         keychain initialize
         app-store-connect fetch-signing-files "$BUNDLE_ID" \
           --type IOS_APP_STORE \
           --create \
-          --strict-match-identifier
+          --strict-match-identifier \
+          --certificate-key=@env:CERTIFICATE_PRIVATE_KEY
     - name: iOS — code signing
       script: |
         set -e
@@ -155,11 +161,16 @@ workflows:
       - name: iOS — certificados y perfiles (ad hoc)
         script: |
           set -e
+          if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            echo "ERROR: Falta CERTIFICATE_PRIVATE_KEY en grupo parcec"
+            exit 1
+          fi
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_ADHOC \
             --create \
-            --strict-match-identifier
+            --strict-match-identifier \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY
       - name: iOS — code signing
         script: |
           xcode-project use-profiles \
