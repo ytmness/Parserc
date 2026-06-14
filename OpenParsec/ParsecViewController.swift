@@ -96,9 +96,6 @@ class ParsecViewController :UIViewController {
 		panGestureRecognizer.delegate = self
 		panGestureRecognizer.minimumNumberOfTouches = 1
 		panGestureRecognizer.maximumNumberOfTouches = 2
-		if SettingsHandler.cursorMode == .direct {
-			panGestureRecognizer.minimumDistance = 2
-		}
 		view.addGestureRecognizer(panGestureRecognizer)
 		self.panGestureRecognizer = panGestureRecognizer
 
@@ -710,7 +707,8 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		button.layer.borderWidth = 0.5
 		button.setTitleColor(UIColor.white.withAlphaComponent(0.95), for: .normal)
 		button.layer.cornerRadius = 8
-		button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+		button.heightAnchor.constraint(equalToConstant: 40).isActive = true
+		button.widthAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
 		button.addTarget(self, action: action, for: .touchUpInside)
 		return button
 	}
