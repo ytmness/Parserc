@@ -201,26 +201,6 @@ struct ParsecView:View
 									.frame(maxWidth:.infinity)
 									.multilineTextAlignment(.center)
 							}
-							Menu {
-								ForEach(ClipboardQuickActionId.allCases, id: \.rawValue) { action in
-									Button(action: {
-										toggleClipboardAction(action)
-									}) {
-										HStack {
-											Text(action.displayTitle)
-											Spacer()
-											if SettingsHandler.isClipboardActionEnabled(action) {
-												Image(systemName: "checkmark")
-											}
-										}
-									}
-								}
-							} label: {
-								Text("Portapapeles")
-									.padding(8)
-									.frame(maxWidth:.infinity)
-									.multilineTextAlignment(.center)
-							}
 							Rectangle()
 								.fill(Color("Foreground"))
 								.opacity(0.25)
@@ -348,12 +328,6 @@ struct ParsecView:View
 		let data = "".data(using: .utf8)!
 		CParsec.sendUserData(type: .getVideoConfig, message: data)
 		CParsec.sendUserData(type: .getAdapterInfo, message: data)
-	}
-
-	func toggleClipboardAction(_ action: ClipboardQuickActionId) {
-		SettingsHandler.setClipboardActionEnabled(action, !SettingsHandler.isClipboardActionEnabled(action))
-		SettingsHandler.save()
-		NotificationCenter.default.post(name: .clipboardActionsDidChange, object: nil)
 	}
 
 }

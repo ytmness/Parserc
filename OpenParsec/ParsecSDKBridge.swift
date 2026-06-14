@@ -423,9 +423,17 @@ class ParsecSDKBridge: ParsecService
 	}
 
 	func sendVirtualKeyboardText(_ text: String) {
-		for char in text {
-			sendVirtualKeyboardInput(text: String(char))
+		let chars = Array(text)
+		guard !chars.isEmpty else { return }
+
+		func sendNext(_ index: Int) {
+			guard index < chars.count else { return }
+			sendVirtualKeyboardInput(text: String(chars[index]))
+			DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.03) {
+				sendNext(index + 1)
+			}
 		}
+		sendNext(0)
 	}
 
 	func sendKeyChord(modifierKeyText: String, keyText: String) {
@@ -433,19 +441,24 @@ class ParsecSDKBridge: ParsecService
 			  let keyCode = KeyCodeTranslators.parsecKeyCodeTranslator(keyText.uppercased()) else {
 			return
 		}
-		var keyboardMessage = ParsecMessage()
-		keyboardMessage.type = MESSAGE_KEYBOARD
-		keyboardMessage.keyboard.pressed = true
-		keyboardMessage.keyboard.code = modifierKey
-		ParsecClientSendMessage(_parsec, &keyboardMessage)
-		keyboardMessage.keyboard.code = keyCode
-		ParsecClientSendMessage(_parsec, &keyboardMessage)
-		DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) {
-			keyboardMessage.keyboard.pressed = false
-			keyboardMessage.keyboard.code = keyCode
-			ParsecClientSendMessage(self._parsec, &keyboardMessage)
-			keyboardMessage.keyboard.code = modifierKey
-			ParsecClientSendMessage(self._parsec, &keyboardMessage)
+
+		func sendPress(_ code: ParsecKeycode, _ pressed: Bool) {
+			var keyboardMessage = ParsecMessage()
+			keyboardMessage.type = MESSAGE_KEYBOARD
+			keyboardMessage.keyboard.pressed = pressed
+			keyboardMessage.keyboard.code = code
+			ParsecClientSendMessage(_parsec, &keyboardMessage)
+		}
+
+		sendPress(modifierKey, true)
+		DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.04) {
+			sendPress(keyCode, true)
+			DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.06) {
+				sendPress(keyCode, false)
+				DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.04) {
+					sendPress(modifierKey, false)
+				}
+			}
 		}
 	}
 
