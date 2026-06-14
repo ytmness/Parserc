@@ -84,6 +84,11 @@ struct SettingsView:View
 									Choice("Touchpad — mover cursor", CursorMode.touchpad)
 								])
                             }
+							Text("1 toque + arrastrar o 2 toques rápidos y arrastrar para seleccionar.")
+								.font(.system(size: 11))
+								.foregroundColor(Color("ForegroundInactive"))
+								.frame(maxWidth: .infinity, alignment: .leading)
+								.padding(.horizontal, 4)
 							CatItem("Right Click Position")
 							{
 								MultiPicker(selection:$rightClickPosition, options:

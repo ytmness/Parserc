@@ -34,6 +34,12 @@ class ParsecViewController :UIViewController {
 	var clipboardQuickBar : UIVisualEffectView?
 	var clipboardButtonStack : UIStackView?
 	var clipboardBarExpanded = false
+
+	private var panGestureRecognizer: UIPanGestureRecognizer!
+	private var singleFingerTapGestureRecognizer: UITapGestureRecognizer!
+	private var doubleTapDragGestureRecognizer: DoubleTapDragGestureRecognizer!
+	private var lastDirectDragPoint: CGPoint = .zero
+	private var directDragActive = false
 	
 	override var prefersPointerLocked: Bool {
 		return true
@@ -92,13 +98,24 @@ class ParsecViewController :UIViewController {
 
 		let panGestureRecognizer = UIPanGestureRecognizer(target:self, action:#selector(self.handlePanGesture(_:)))
 		panGestureRecognizer.delegate = self
+		panGestureRecognizer.minimumNumberOfTouches = 1
+		panGestureRecognizer.maximumNumberOfTouches = 2
+		if SettingsHandler.cursorMode == .direct {
+			panGestureRecognizer.minimumDistance = 2
+		}
 		view.addGestureRecognizer(panGestureRecognizer)
+		self.panGestureRecognizer = panGestureRecognizer
 
-		let doubleTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
-		doubleTapGestureRecognizer.numberOfTapsRequired = 2
-		doubleTapGestureRecognizer.numberOfTouchesRequired = 1
-		doubleTapGestureRecognizer.allowedTouchTypes = [0, 2]
-		view.addGestureRecognizer(doubleTapGestureRecognizer)
+		let doubleTapDragGestureRecognizer = DoubleTapDragGestureRecognizer()
+		doubleTapDragGestureRecognizer.delegate = self
+		doubleTapDragGestureRecognizer.onFirstTapClick = { [weak self] location in
+			self?.touchController.onTap(typeOfTap: 1, location: location)
+		}
+		doubleTapDragGestureRecognizer.onSelectionDrag = { [weak self] state, location in
+			self?.touchController.onSelectionDrag(typeOfTap: 1, location: location, state: state)
+		}
+		view.addGestureRecognizer(doubleTapDragGestureRecognizer)
+		self.doubleTapDragGestureRecognizer = doubleTapDragGestureRecognizer
 
 		let twoFingerDoubleTapPasteGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleTwoFingerDoubleTapPaste(_:)))
 		twoFingerDoubleTapPasteGestureRecognizer.numberOfTapsRequired = 2
@@ -106,12 +123,13 @@ class ParsecViewController :UIViewController {
 		twoFingerDoubleTapPasteGestureRecognizer.allowedTouchTypes = [0]
 		view.addGestureRecognizer(twoFingerDoubleTapPasteGestureRecognizer)
 
-		// Add tap gesture recognizer for single-finger touch
+		// Add tap gesture recognizer for single-finger touch (touchpad mode)
 		let singleFingerTapGestureRecognizer = UITapGestureRecognizer(target:self, action:#selector(handleSingleFingerTap(_:)))
 		singleFingerTapGestureRecognizer.numberOfTouchesRequired = 1
 		singleFingerTapGestureRecognizer.allowedTouchTypes = [0, 2]
-		singleFingerTapGestureRecognizer.require(toFail: doubleTapGestureRecognizer)
+		singleFingerTapGestureRecognizer.delegate = self
 		view.addGestureRecognizer(singleFingerTapGestureRecognizer)
+		self.singleFingerTapGestureRecognizer = singleFingerTapGestureRecognizer
 
 		// Add tap gesture recognizer for two-finger touch
 		let twoFingerTapGestureRecognizer = UITapGestureRecognizer(target:self, action:#selector(handleTwoFingerTap(_:)))
@@ -213,7 +231,18 @@ class ParsecViewController :UIViewController {
 }
 
 extension ParsecViewController : UIGestureRecognizerDelegate {
-	
+
+	func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+		if gestureRecognizer === singleFingerTapGestureRecognizer && SettingsHandler.cursorMode == .direct {
+			return false
+		}
+		if gestureRecognizer === panGestureRecognizer,
+		   doubleTapDragGestureRecognizer.isSelectionDragActive {
+			return false
+		}
+		return true
+	}
+
 	@objc func handlePanGesture(_ gestureRecognizer:UIPanGestureRecognizer)
 	{
 		//		print("number = \(gestureRecognizer.numberOfTouches) status = \(gestureRecognizer.state.rawValue)")
@@ -234,7 +263,22 @@ extension ParsecViewController : UIGestureRecognizerDelegate {
 
 			if SettingsHandler.cursorMode == .direct {
 				let position = gestureRecognizer.location(in: gestureRecognizer.view)
-				CParsec.sendMousePosition(Int32(position.x), Int32(position.y))
+				switch gestureRecognizer.state {
+				case .began:
+					directDragActive = true
+					lastDirectDragPoint = position
+					CParsec.sendMouseMessage(ParsecMouseButton(rawValue: 1), Int32(position.x), Int32(position.y), true)
+				case .changed:
+					CParsec.sendMousePosition(Int32(position.x), Int32(position.y))
+					lastDirectDragPoint = position
+				case .ended, .cancelled:
+					if directDragActive {
+						CParsec.sendMouseMessage(ParsecMouseButton(rawValue: 1), Int32(position.x), Int32(position.y), false)
+						directDragActive = false
+					}
+				default:
+					break
+				}
 			} else {
 				if gestureRecognizer.state == .changed {
 					let delta = gestureRecognizer.translation(in: gestureRecognizer.view)
@@ -246,17 +290,6 @@ extension ParsecViewController : UIGestureRecognizerDelegate {
 				}
 			}
 
-			
-			if gestureRecognizer.state == .began && SettingsHandler.cursorMode == .direct {
-				let button = ParsecMouseButton.init(rawValue: 1)
-				CParsec.sendMouseClickMessage(button, true)
-			}
-			
-		} else if gestureRecognizer.numberOfTouches == 0 {
-			if (gestureRecognizer.state == .ended || gestureRecognizer.state == .cancelled) && SettingsHandler.cursorMode == .direct {
-				let button = ParsecMouseButton.init(rawValue: 1)
-				CParsec.sendMouseClickMessage(button, false)
-			}
 		}
 		
 		
@@ -267,11 +300,6 @@ extension ParsecViewController : UIGestureRecognizerDelegate {
 		let location = gestureRecognizer.location(in:gestureRecognizer.view)
 		touchController.onTap(typeOfTap: 1, location: location)
 		
-	}
-
-	@objc func handleDoubleTap(_ gestureRecognizer: UITapGestureRecognizer) {
-		let location = gestureRecognizer.location(in: gestureRecognizer.view)
-		touchController.onDoubleTap(typeOfTap: 1, location: location)
 	}
 
 	@objc func handleTwoFingerDoubleTapPaste(_ gestureRecognizer: UITapGestureRecognizer) {
