@@ -80,8 +80,8 @@ struct SettingsView:View
                             {
                                 MultiPicker(selection:$cursorMode, options:
 								[
-									Choice("Touchpad", CursorMode.touchpad),
-									Choice("Direct", CursorMode.direct)
+									Choice("Directo — seleccionar texto", CursorMode.direct),
+									Choice("Touchpad — mover cursor", CursorMode.touchpad)
 								])
                             }
 							CatItem("Right Click Position")

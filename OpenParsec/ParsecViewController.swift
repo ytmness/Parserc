@@ -94,25 +94,30 @@ class ParsecViewController :UIViewController {
 		panGestureRecognizer.delegate = self
 		view.addGestureRecognizer(panGestureRecognizer)
 
-		
-		
-		let doubleTapPasteGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTapPaste(_:)))
-		doubleTapPasteGestureRecognizer.numberOfTapsRequired = 2
-		doubleTapPasteGestureRecognizer.numberOfTouchesRequired = 1
-		doubleTapPasteGestureRecognizer.allowedTouchTypes = [0, 2]
-		view.addGestureRecognizer(doubleTapPasteGestureRecognizer)
+		let doubleTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
+		doubleTapGestureRecognizer.numberOfTapsRequired = 2
+		doubleTapGestureRecognizer.numberOfTouchesRequired = 1
+		doubleTapGestureRecognizer.allowedTouchTypes = [0, 2]
+		view.addGestureRecognizer(doubleTapGestureRecognizer)
+
+		let twoFingerDoubleTapPasteGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleTwoFingerDoubleTapPaste(_:)))
+		twoFingerDoubleTapPasteGestureRecognizer.numberOfTapsRequired = 2
+		twoFingerDoubleTapPasteGestureRecognizer.numberOfTouchesRequired = 2
+		twoFingerDoubleTapPasteGestureRecognizer.allowedTouchTypes = [0]
+		view.addGestureRecognizer(twoFingerDoubleTapPasteGestureRecognizer)
 
 		// Add tap gesture recognizer for single-finger touch
 		let singleFingerTapGestureRecognizer = UITapGestureRecognizer(target:self, action:#selector(handleSingleFingerTap(_:)))
 		singleFingerTapGestureRecognizer.numberOfTouchesRequired = 1
 		singleFingerTapGestureRecognizer.allowedTouchTypes = [0, 2]
-		singleFingerTapGestureRecognizer.require(toFail: doubleTapPasteGestureRecognizer)
+		singleFingerTapGestureRecognizer.require(toFail: doubleTapGestureRecognizer)
 		view.addGestureRecognizer(singleFingerTapGestureRecognizer)
 
 		// Add tap gesture recognizer for two-finger touch
 		let twoFingerTapGestureRecognizer = UITapGestureRecognizer(target:self, action:#selector(handleTwoFingerTap(_:)))
 		twoFingerTapGestureRecognizer.numberOfTouchesRequired = 2
 		twoFingerTapGestureRecognizer.allowedTouchTypes = [0]
+		twoFingerTapGestureRecognizer.require(toFail: twoFingerDoubleTapPasteGestureRecognizer)
 		view.addGestureRecognizer(twoFingerTapGestureRecognizer)
 		//		view.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
 		//		view.backgroundColor = UIColor(red: 0x66, green: 0xcc, blue: 0xff, alpha: 1.0)
@@ -125,7 +130,11 @@ class ParsecViewController :UIViewController {
 		let longPressGestureRecognizer = UILongPressGestureRecognizer(target:self, action:#selector(handleLongPress(_:)))
 		longPressGestureRecognizer.numberOfTouchesRequired = 1
 		longPressGestureRecognizer.allowedTouchTypes = [0, 2]
+		longPressGestureRecognizer.minimumPressDuration = 0.28
+		longPressGestureRecognizer.allowableMovement = 12
 		view.addGestureRecognizer(longPressGestureRecognizer)
+
+		panGestureRecognizer.require(toFail: longPressGestureRecognizer)
 		
 		NotificationCenter.default.addObserver(
 			self,
@@ -227,8 +236,14 @@ extension ParsecViewController : UIGestureRecognizerDelegate {
 				let position = gestureRecognizer.location(in: gestureRecognizer.view)
 				CParsec.sendMousePosition(Int32(position.x), Int32(position.y))
 			} else {
-				let delta = gestureRecognizer.velocity(in: gestureRecognizer.view)
-				CParsec.sendMouseDelta(Int32(Float(delta.x) / 60 * SettingsHandler.mouseSensitivity), Int32(Float(delta.y) / 60 * SettingsHandler.mouseSensitivity))
+				if gestureRecognizer.state == .changed {
+					let delta = gestureRecognizer.translation(in: gestureRecognizer.view)
+					CParsec.sendMouseDelta(
+						Int32(Float(delta.x) * SettingsHandler.mouseSensitivity * 0.45),
+						Int32(Float(delta.y) * SettingsHandler.mouseSensitivity * 0.45)
+					)
+					gestureRecognizer.setTranslation(.zero, in: gestureRecognizer.view)
+				}
 			}
 
 			
@@ -254,7 +269,12 @@ extension ParsecViewController : UIGestureRecognizerDelegate {
 		
 	}
 
-	@objc func handleDoubleTapPaste(_ gestureRecognizer: UITapGestureRecognizer) {
+	@objc func handleDoubleTap(_ gestureRecognizer: UITapGestureRecognizer) {
+		let location = gestureRecognizer.location(in: gestureRecognizer.view)
+		touchController.onDoubleTap(typeOfTap: 1, location: location)
+	}
+
+	@objc func handleTwoFingerDoubleTapPaste(_ gestureRecognizer: UITapGestureRecognizer) {
 		pasteFromClipboardTapped()
 		UIImpactFeedbackGenerator(style: .light).impactOccurred()
 	}
@@ -281,22 +301,33 @@ extension ParsecViewController : UIGestureRecognizerDelegate {
 	}
 	
 	@objc func handleLongPress(_ gestureRecognizer:UIGestureRecognizer) {
-		if SettingsHandler.cursorMode != .touchpad {
-			return
-		}
 		let button = ParsecMouseButton.init(rawValue: 1)
 		
 		if gestureRecognizer.state == .began{
-			CParsec.sendMouseClickMessage(button, true)
-			lastLongPressPoint = gestureRecognizer.location(in: gestureRecognizer.view)
+			if SettingsHandler.cursorMode == .direct {
+				lastLongPressPoint = gestureRecognizer.location(in: gestureRecognizer.view)
+				CParsec.sendMouseMessage(button, Int32(lastLongPressPoint.x), Int32(lastLongPressPoint.y), true)
+			} else {
+				CParsec.sendMouseClickMessage(button, true)
+				lastLongPressPoint = gestureRecognizer.location(in: gestureRecognizer.view)
+			}
 		} else if gestureRecognizer.state == .ended {
-			CParsec.sendMouseClickMessage(button, false)
+			if SettingsHandler.cursorMode == .direct {
+				let location = gestureRecognizer.location(in: gestureRecognizer.view)
+				CParsec.sendMouseMessage(button, Int32(location.x), Int32(location.y), false)
+			} else {
+				CParsec.sendMouseClickMessage(button, false)
+			}
 		} else if gestureRecognizer.state == .changed {
 			let newLocation = gestureRecognizer.location(in: gestureRecognizer.view)
-			CParsec.sendMouseDelta(
-				Int32(Float(newLocation.x - lastLongPressPoint.x) * SettingsHandler.mouseSensitivity),
-				Int32(Float(newLocation.y - lastLongPressPoint.y) * SettingsHandler.mouseSensitivity)
-			)
+			if SettingsHandler.cursorMode == .direct {
+				CParsec.sendMousePosition(Int32(newLocation.x), Int32(newLocation.y))
+			} else {
+				CParsec.sendMouseDelta(
+					Int32(Float(newLocation.x - lastLongPressPoint.x) * SettingsHandler.mouseSensitivity),
+					Int32(Float(newLocation.y - lastLongPressPoint.y) * SettingsHandler.mouseSensitivity)
+				)
+			}
 			lastLongPressPoint = newLocation
 		}
 	}

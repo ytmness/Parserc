@@ -52,6 +52,35 @@ class TouchController
 
 	}
 
+	func onDoubleTap(typeOfTap: Int, location: CGPoint) {
+		let parsecTap = ParsecMouseButton(rawValue: UInt32(typeOfTap))
+		if SettingsHandler.cursorMode == .direct {
+			let x = Int32(location.x)
+			let y = Int32(location.y)
+			CParsec.sendMouseMessage(parsecTap, x, y, true)
+			DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+				CParsec.sendMouseMessage(parsecTap, x, y, false)
+				DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+					CParsec.sendMouseMessage(parsecTap, x, y, true)
+					DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) {
+						CParsec.sendMouseMessage(parsecTap, x, y, false)
+					}
+				}
+			}
+		} else {
+			CParsec.sendMouseClickMessage(parsecTap, true)
+			DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+				CParsec.sendMouseClickMessage(parsecTap, false)
+				DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+					CParsec.sendMouseClickMessage(parsecTap, true)
+					DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) {
+						CParsec.sendMouseClickMessage(parsecTap, false)
+					}
+				}
+			}
+		}
+	}
+
 	public func viewDidLoad()
 	{
 

@@ -5,7 +5,7 @@ struct SettingsHandler
 	//public static var renderer:RendererType = .opengl
 	public static var resolution : ParsecResolution = ParsecResolution.resolutions[1]
 	public static var decoder:DecoderPref = .h264
-	public static var cursorMode:CursorMode = .touchpad
+	public static var cursorMode:CursorMode = .direct
 	public static var cursorScale:Float = 0.5
 	public static var mouseSensitivity : Float = 1.0
 	public static var noOverlay:Bool = false
