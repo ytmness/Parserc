@@ -11,6 +11,19 @@ struct SettingsHandler
 	public static var noOverlay:Bool = false
 	public static var hideStatusBar:Bool = true
 	public static var rightClickPosition:RightClickPosition = .firstFinger
+	public static var clipboardActionsEnabled: Set<String> = Set(ClipboardQuickActionId.allCases.map(\.rawValue))
+	
+	public static func isClipboardActionEnabled(_ action: ClipboardQuickActionId) -> Bool {
+		clipboardActionsEnabled.contains(action.rawValue)
+	}
+
+	public static func setClipboardActionEnabled(_ action: ClipboardQuickActionId, _ enabled: Bool) {
+		if enabled {
+			clipboardActionsEnabled.insert(action.rawValue)
+		} else {
+			clipboardActionsEnabled.remove(action.rawValue)
+		}
+	}
 	
 	public static func load()
 	{
@@ -30,6 +43,10 @@ struct SettingsHandler
 			{ noOverlay = UserDefaults.standard.bool(forKey:"noOverlay") }
 		if UserDefaults.standard.exists(forKey:"hideStatusBar")
 		{ hideStatusBar = UserDefaults.standard.bool(forKey:"hideStatusBar") }
+		if UserDefaults.standard.exists(forKey:"clipboardActionsEnabled"),
+		   let saved = UserDefaults.standard.array(forKey:"clipboardActionsEnabled") as? [String] {
+			clipboardActionsEnabled = Set(saved)
+		}
 		
 		if UserDefaults.standard.exists(forKey:"resolution") {
 			for res in ParsecResolution.resolutions {
@@ -52,6 +69,7 @@ struct SettingsHandler
 		UserDefaults.standard.set(noOverlay, forKey:"noOverlay")
 		UserDefaults.standard.set(resolution.desc, forKey:"resolution")
 		UserDefaults.standard.set(hideStatusBar, forKey: "hideStatusBar")
+		UserDefaults.standard.set(Array(clipboardActionsEnabled), forKey: "clipboardActionsEnabled")
 	}
 }
 
