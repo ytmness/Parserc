@@ -30,6 +30,10 @@ class ParsecViewController :UIViewController {
 	var keyboardAccessoriesView : UIView?
 	var keyboardHeight : CGFloat = 0.0
 	var clipboardQuickBar : UIVisualEffectView?
+	var clipboardContainer : UIView?
+	var clipboardToggleButton : UIButton?
+	var clipboardButtonStack : UIStackView?
+	var clipboardBarExpanded = false
 
 	private var panGestureRecognizer: UIPanGestureRecognizer!
 	private var singleFingerTapGestureRecognizer: UITapGestureRecognizer!
@@ -162,6 +166,13 @@ class ParsecViewController :UIViewController {
 		)
 
 		setupClipboardQuickBar()
+
+		NotificationCenter.default.addObserver(
+			self,
+			selector: #selector(clipboardBarVisibilityChanged),
+			name: .clipboardBarVisibilityDidChange,
+			object: nil
+		)
 	}
 	
 	override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -180,8 +191,8 @@ class ParsecViewController :UIViewController {
 			parent.setChildForHomeIndicatorAutoHidden(self)
 			parent.setChildViewControllerForPointerLock(self)
 		}
-		if let bar = clipboardQuickBar {
-			view.bringSubviewToFront(bar)
+		if let container = clipboardContainer {
+			view.bringSubviewToFront(container)
 		}
 	}
 	
@@ -193,6 +204,7 @@ class ParsecViewController :UIViewController {
 		}
 		NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
 		NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
+		NotificationCenter.default.removeObserver(self, name: .clipboardBarVisibilityDidChange, object: nil)
 	}
 	
 	
@@ -480,12 +492,6 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		let copyBarButton = createClipboardButton(displayText: "Copiar", action: #selector(sendCopyShortcutTapped))
 		let cutBarButton = createClipboardButton(displayText: "Cortar", action: #selector(sendCutShortcutTapped))
 		let pasteShortcutBarButton = createClipboardButton(displayText: "⌃V", action: #selector(sendPasteShortcutTapped))
-		let copyMacBarButton = createClipboardButton(displayText: "⌘C", action: #selector(sendCopyMacShortcutTapped))
-		let pasteMacBarButton = createClipboardButton(displayText: "⌘V", action: #selector(sendPasteMacShortcutTapped))
-		let cutMacBarButton = createClipboardButton(displayText: "⌘X", action: #selector(sendCutMacShortcutTapped))
-		let selectAllMacBarButton = createClipboardButton(displayText: "⌘A", action: #selector(sendSelectAllMacShortcutTapped))
-		let copyCtrlBarButton = createClipboardButton(displayText: "⌃C", action: #selector(sendCopyShortcutTapped))
-		let selectAllCtrlBarButton = createClipboardButton(displayText: "⌃A", action: #selector(sendSelectAllTapped))
 		let f1Button = createKeyboardButton(displayText: "F1", keyText: "F1", isToggleable: false)
 		let f2Button = createKeyboardButton(displayText: "F2", keyText: "F2", isToggleable: false)
 		let f3Button = createKeyboardButton(displayText: "F3", keyText: "F3", isToggleable: false)
@@ -505,9 +511,7 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		
 
 		let buttons = [windowsBarButton, escapeBarButton, tabBarButton, shiftBarButton, controlBarButton, altBarButton, deleteBarButton,
-					   selectAllBarButton, pasteBarButton, copyBarButton, cutBarButton,
-					   selectAllCtrlBarButton, copyCtrlBarButton, pasteShortcutBarButton,
-					   copyMacBarButton, pasteMacBarButton, cutMacBarButton, selectAllMacBarButton,
+					   selectAllBarButton, pasteBarButton, copyBarButton, cutBarButton, pasteShortcutBarButton,
 					   f1Button, f2Button, f3Button, f4Button, f5Button, f6Button, f7Button, f8Button, f9Button, f10Button, f11Button, f12Button,
 								   upButton, downButton, leftButton, rightButton
 		]
@@ -640,12 +644,17 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 	}
 
 	func setupClipboardQuickBar() {
+		let container = UIView()
+		container.translatesAutoresizingMaskIntoConstraints = false
+		view.addSubview(container)
+
 		let blur = UIBlurEffect(style: .systemUltraThinMaterialDark)
 		let bar = UIVisualEffectView(effect: blur)
 		bar.translatesAutoresizingMaskIntoConstraints = false
 		bar.layer.cornerRadius = 12
 		bar.clipsToBounds = true
-		bar.alpha = 0.82
+		bar.alpha = 0
+		bar.isHidden = true
 
 		let scrollView = UIScrollView()
 		scrollView.showsHorizontalScrollIndicator = false
@@ -657,31 +666,30 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		stack.alignment = .center
 		stack.translatesAutoresizingMaskIntoConstraints = false
 
-		let items: [(String, Selector)] = [
-			("Todo", #selector(sendSelectAllTapped)),
-			("Copiar", #selector(sendCopyShortcutTapped)),
-			("Pegar", #selector(pasteFromClipboardTapped)),
-			("Cortar", #selector(sendCutShortcutTapped)),
-			("⌃A", #selector(sendSelectAllTapped)),
-			("⌃C", #selector(sendCopyShortcutTapped)),
-			("⌃V", #selector(sendPasteShortcutTapped)),
-			("⌘A", #selector(sendSelectAllMacShortcutTapped)),
-			("⌘C", #selector(sendCopyMacShortcutTapped)),
-			("⌘V", #selector(sendPasteMacShortcutTapped)),
-			("⌘X", #selector(sendCutMacShortcutTapped)),
-		]
-		for (title, action) in items {
-			stack.addArrangedSubview(createQuickActionButton(title: title, action: action))
-		}
-
 		scrollView.addSubview(stack)
 		bar.contentView.addSubview(scrollView)
-		view.addSubview(bar)
+
+		let toggle = UIButton(type: .system)
+		toggle.setImage(UIImage(systemName: "doc.on.clipboard"), for: .normal)
+		toggle.tintColor = UIColor.white.withAlphaComponent(0.9)
+		toggle.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+		toggle.layer.cornerRadius = 22
+		toggle.translatesAutoresizingMaskIntoConstraints = false
+		toggle.addTarget(self, action: #selector(toggleClipboardBarTapped), for: .touchUpInside)
+
+		container.addSubview(bar)
+		container.addSubview(toggle)
 
 		NSLayoutConstraint.activate([
-			bar.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
-			bar.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
-			bar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+			container.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+			container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+			toggle.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			toggle.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+			toggle.widthAnchor.constraint(equalToConstant: 44),
+			toggle.heightAnchor.constraint(equalToConstant: 44),
+			bar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			bar.bottomAnchor.constraint(equalTo: toggle.topAnchor, constant: -8),
+			bar.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
 			scrollView.leadingAnchor.constraint(equalTo: bar.contentView.leadingAnchor, constant: 6),
 			scrollView.trailingAnchor.constraint(equalTo: bar.contentView.trailingAnchor, constant: -6),
 			scrollView.topAnchor.constraint(equalTo: bar.contentView.topAnchor, constant: 6),
@@ -693,7 +701,69 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 			stack.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
 		])
 
+		clipboardContainer = container
+		clipboardToggleButton = toggle
 		clipboardQuickBar = bar
+		clipboardButtonStack = stack
+		clipboardBarExpanded = SettingsHandler.clipboardBarVisible
+
+		rebuildClipboardButtons()
+		applyClipboardBarVisibility(animated: false)
+	}
+
+	@objc func clipboardBarVisibilityChanged() {
+		clipboardBarExpanded = SettingsHandler.clipboardBarVisible
+		applyClipboardBarVisibility(animated: true)
+	}
+
+	func rebuildClipboardButtons() {
+		guard let stack = clipboardButtonStack else { return }
+		stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+		let actions: [(ClipboardQuickActionId, Selector)] = [
+			(.selectAll, #selector(sendSelectAllTapped)),
+			(.copy, #selector(sendCopyShortcutTapped)),
+			(.paste, #selector(pasteFromClipboardTapped)),
+			(.cut, #selector(sendCutShortcutTapped)),
+		]
+		for (action, selector) in actions where SettingsHandler.isClipboardActionEnabled(action) {
+			stack.addArrangedSubview(createQuickActionButton(title: action.displayTitle, action: selector))
+		}
+	}
+
+	@objc func toggleClipboardBarTapped() {
+		clipboardBarExpanded.toggle()
+		SettingsHandler.clipboardBarVisible = clipboardBarExpanded
+		SettingsHandler.save()
+		applyClipboardBarVisibility(animated: true)
+	}
+
+	func applyClipboardBarVisibility(animated: Bool) {
+		guard let bar = clipboardQuickBar, let toggle = clipboardToggleButton else { return }
+
+		let showBar = clipboardBarExpanded && (clipboardButtonStack?.arrangedSubviews.isEmpty == false)
+		let update = {
+			if showBar {
+				bar.isHidden = false
+				bar.alpha = 0.82
+				toggle.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+			} else {
+				bar.alpha = 0
+				toggle.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+			}
+		}
+		let finish = {
+			if !showBar {
+				bar.isHidden = true
+			}
+		}
+
+		if animated {
+			UIView.animate(withDuration: 0.22, animations: update) { _ in finish() }
+		} else {
+			update()
+			finish()
+		}
 	}
 
 	func createQuickActionButton(title: String, action: Selector) -> UIButton {
@@ -739,26 +809,6 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 
 	@objc func sendSelectAllTapped() {
 		CParsec.sendKeyChord(modifierKeyText: "CONTROL", keyText: "A")
-		UIImpactFeedbackGenerator(style: .light).impactOccurred()
-	}
-
-	@objc func sendCopyMacShortcutTapped() {
-		CParsec.sendKeyChord(modifierKeyText: "LGUI", keyText: "C")
-		UIImpactFeedbackGenerator(style: .light).impactOccurred()
-	}
-
-	@objc func sendPasteMacShortcutTapped() {
-		CParsec.sendKeyChord(modifierKeyText: "LGUI", keyText: "V")
-		UIImpactFeedbackGenerator(style: .light).impactOccurred()
-	}
-
-	@objc func sendCutMacShortcutTapped() {
-		CParsec.sendKeyChord(modifierKeyText: "LGUI", keyText: "X")
-		UIImpactFeedbackGenerator(style: .light).impactOccurred()
-	}
-
-	@objc func sendSelectAllMacShortcutTapped() {
-		CParsec.sendKeyChord(modifierKeyText: "LGUI", keyText: "A")
 		UIImpactFeedbackGenerator(style: .light).impactOccurred()
 	}
 	

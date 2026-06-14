@@ -80,7 +80,7 @@ class SharedModel: ObservableObject {
 }
 
 enum ClipboardQuickActionId: String, CaseIterable {
-	case selectAll, copy, paste, cut, copyMac, pasteMac
+	case selectAll, copy, paste, cut
 
 	var displayTitle: String {
 		switch self {
@@ -88,14 +88,13 @@ enum ClipboardQuickActionId: String, CaseIterable {
 		case .copy: return "Copiar"
 		case .paste: return "Pegar"
 		case .cut: return "Cortar"
-		case .copyMac: return "⌘C"
-		case .pasteMac: return "⌘V"
 		}
 	}
 }
 
 extension Notification.Name {
 	static let clipboardActionsDidChange = Notification.Name("ClipboardActionsDidChange")
+	static let clipboardBarVisibilityDidChange = Notification.Name("ClipboardBarVisibilityDidChange")
 }
 
 class DataManager {

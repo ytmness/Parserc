@@ -76,6 +76,7 @@ struct ParsecView:View
 	@State var muted:Bool = false
     @State var preferH265:Bool = true
 	@State var constantFps = false
+	@State var clipboardBarVisible: Bool = SettingsHandler.clipboardBarVisible
 	
 	@State var resolutions : [ParsecResolution]
 	@State var bitrates : [Int]
@@ -197,6 +198,12 @@ struct ParsecView:View
 							Button(action:toggleConstantFps)
 							{
 								Text("Constant FPS: \(constantFps ? "ON" : "OFF")")
+									.padding(8)
+									.frame(maxWidth:.infinity)
+									.multilineTextAlignment(.center)
+							}
+							Button(action: toggleClipboardBar) {
+								Text("Atajos Ctrl: \(clipboardBarVisible ? "Visibles" : "Ocultos")")
 									.padding(8)
 									.frame(maxWidth:.infinity)
 									.multilineTextAlignment(.center)
@@ -328,6 +335,13 @@ struct ParsecView:View
 		let data = "".data(using: .utf8)!
 		CParsec.sendUserData(type: .getVideoConfig, message: data)
 		CParsec.sendUserData(type: .getAdapterInfo, message: data)
+	}
+
+	func toggleClipboardBar() {
+		clipboardBarVisible.toggle()
+		SettingsHandler.clipboardBarVisible = clipboardBarVisible
+		SettingsHandler.save()
+		NotificationCenter.default.post(name: .clipboardBarVisibilityDidChange, object: nil)
 	}
 
 }
