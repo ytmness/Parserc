@@ -29,6 +29,7 @@ class ParsecViewController :UIViewController {
 	
 	var keyboardAccessoriesView : UIView?
 	var keyboardHeight : CGFloat = 0.0
+	var clipboardQuickBar : UIVisualEffectView?
 	
 	override var prefersPointerLocked: Bool {
 		return true
@@ -91,10 +92,17 @@ class ParsecViewController :UIViewController {
 
 		
 		
+		let doubleTapPasteGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTapPaste(_:)))
+		doubleTapPasteGestureRecognizer.numberOfTapsRequired = 2
+		doubleTapPasteGestureRecognizer.numberOfTouchesRequired = 1
+		doubleTapPasteGestureRecognizer.allowedTouchTypes = [0, 2]
+		view.addGestureRecognizer(doubleTapPasteGestureRecognizer)
+
 		// Add tap gesture recognizer for single-finger touch
 		let singleFingerTapGestureRecognizer = UITapGestureRecognizer(target:self, action:#selector(handleSingleFingerTap(_:)))
 		singleFingerTapGestureRecognizer.numberOfTouchesRequired = 1
 		singleFingerTapGestureRecognizer.allowedTouchTypes = [0, 2]
+		singleFingerTapGestureRecognizer.require(toFail: doubleTapPasteGestureRecognizer)
 		view.addGestureRecognizer(singleFingerTapGestureRecognizer)
 
 		// Add tap gesture recognizer for two-finger touch
@@ -128,7 +136,8 @@ class ParsecViewController :UIViewController {
 			name: UIResponder.keyboardWillHideNotification,
 			object: nil
 		)
-		
+
+		setupClipboardQuickBar()
 	}
 	
 	override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -239,6 +248,11 @@ extension ParsecViewController : UIGestureRecognizerDelegate {
 		touchController.onTap(typeOfTap: 1, location: location)
 		
 	}
+
+	@objc func handleDoubleTapPaste(_ gestureRecognizer: UITapGestureRecognizer) {
+		pasteFromClipboardTapped()
+		UIImpactFeedbackGenerator(style: .light).impactOccurred()
+	}
 	
 	@objc func handleTwoFingerTap(_ gestureRecognizer:UITapGestureRecognizer)
 	{
@@ -347,13 +361,25 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 			
 		}
 	}
+
+	var autocorrectionType: UITextAutocorrectionType {
+		.no
+	}
+
+	var spellCheckingType: UITextSpellCheckingType {
+		.no
+	}
 	
 	override var canBecomeFirstResponder: Bool {
 		return true
 	}
 
 	func insertText(_ text: String) {
-		CParsec.sendVirtualKeyboardInput(text: text)
+		if text.count == 1 {
+			CParsec.sendVirtualKeyboardInput(text: text)
+		} else {
+			CParsec.sendVirtualKeyboardText(text)
+		}
 	}
 
 	func deleteBackward() {
@@ -390,6 +416,13 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		let controlBarButton = createKeyboardButton(displayText: "⌃", keyText: "CONTROL", isToggleable: true)
 		let altBarButton = createKeyboardButton(displayText: "⌥", keyText: "LALT", isToggleable: true)
 		let deleteBarButton = createKeyboardButton(displayText: "Del", keyText: "DELETE", isToggleable: false)
+		let selectAllBarButton = createClipboardButton(displayText: "Todo", action: #selector(sendSelectAllTapped))
+		let pasteBarButton = createClipboardButton(displayText: "Pegar", action: #selector(pasteFromClipboardTapped))
+		let copyBarButton = createClipboardButton(displayText: "Copiar", action: #selector(sendCopyShortcutTapped))
+		let cutBarButton = createClipboardButton(displayText: "Cortar", action: #selector(sendCutShortcutTapped))
+		let pasteShortcutBarButton = createClipboardButton(displayText: "⌃V", action: #selector(sendPasteShortcutTapped))
+		let copyMacBarButton = createClipboardButton(displayText: "⌘C", action: #selector(sendCopyMacShortcutTapped))
+		let pasteMacBarButton = createClipboardButton(displayText: "⌘V", action: #selector(sendPasteMacShortcutTapped))
 		let f1Button = createKeyboardButton(displayText: "F1", keyText: "F1", isToggleable: false)
 		let f2Button = createKeyboardButton(displayText: "F2", keyText: "F2", isToggleable: false)
 		let f3Button = createKeyboardButton(displayText: "F3", keyText: "F3", isToggleable: false)
@@ -409,6 +442,7 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		
 
 		let buttons = [windowsBarButton, escapeBarButton, tabBarButton, shiftBarButton, controlBarButton, altBarButton, deleteBarButton,
+					   selectAllBarButton, pasteBarButton, copyBarButton, cutBarButton, pasteShortcutBarButton, copyMacBarButton, pasteMacBarButton,
 					   f1Button, f2Button, f3Button, f4Button, f5Button, f6Button, f7Button, f8Button, f9Button, f10Button, f11Button, f12Button,
 								   upButton, downButton, leftButton, rightButton
 		]
@@ -506,8 +540,6 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 	
 	func createKeyboardButton(displayText: String, keyText: String, isToggleable: Bool) -> UIButton {
 		let button = KeyBoardButton(keyText: keyText, isToggleable: isToggleable)
-		
-		// Set the image and button properties
 		button.setTitle(displayText, for: .normal)
 		button.titleLabel?.font = UIFont(name: "System", size: 10.0)
 		button.frame = CGRect(x: 0, y: 0, width: 36, height: 36)
@@ -520,10 +552,109 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		
 		button.titleLabel?.contentMode = .scaleAspectFit
 
-		// Set target and action for button
 		button.addTarget(target, action: #selector(toolbarButtonClicked(_:)), for: .touchUpInside)
 		
 		return button
+	}
+
+	func createClipboardButton(displayText: String, action: Selector) -> UIButton {
+		let button = UIButton(type: .system)
+		button.setTitle(displayText, for: .normal)
+		button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+		button.titleLabel?.adjustsFontSizeToFitWidth = true
+		button.titleLabel?.minimumScaleFactor = 0.7
+		button.frame = CGRect(x: 0, y: 0, width: 52, height: 40)
+		if let label = button.titleLabel {
+			label.textAlignment = .center
+		}
+		button.backgroundColor = .black
+		button.setTitleColor(.white, for: .normal)
+		button.layer.cornerRadius = 6.0
+		button.addTarget(self, action: action, for: .touchUpInside)
+		return button
+	}
+
+	func setupClipboardQuickBar() {
+		let blur = UIBlurEffect(style: .systemUltraThinMaterialDark)
+		let bar = UIVisualEffectView(effect: blur)
+		bar.translatesAutoresizingMaskIntoConstraints = false
+		bar.layer.cornerRadius = 12
+		bar.clipsToBounds = true
+
+		let stack = UIStackView()
+		stack.axis = .horizontal
+		stack.spacing = 6
+		stack.distribution = .fillEqually
+		stack.translatesAutoresizingMaskIntoConstraints = false
+
+		let items: [(String, Selector)] = [
+			("Todo", #selector(sendSelectAllTapped)),
+			("Copiar", #selector(sendCopyShortcutTapped)),
+			("Pegar", #selector(pasteFromClipboardTapped)),
+			("Cortar", #selector(sendCutShortcutTapped)),
+			("⌘C", #selector(sendCopyMacShortcutTapped)),
+			("⌘V", #selector(sendPasteMacShortcutTapped)),
+		]
+		for (title, action) in items {
+			stack.addArrangedSubview(createQuickActionButton(title: title, action: action))
+		}
+
+		bar.contentView.addSubview(stack)
+		view.addSubview(bar)
+
+		NSLayoutConstraint.activate([
+			bar.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
+			bar.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
+			bar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+			stack.leadingAnchor.constraint(equalTo: bar.contentView.leadingAnchor, constant: 6),
+			stack.trailingAnchor.constraint(equalTo: bar.contentView.trailingAnchor, constant: -6),
+			stack.topAnchor.constraint(equalTo: bar.contentView.topAnchor, constant: 6),
+			stack.bottomAnchor.constraint(equalTo: bar.contentView.bottomAnchor, constant: -6),
+		])
+		clipboardQuickBar = bar
+	}
+
+	func createQuickActionButton(title: String, action: Selector) -> UIButton {
+		let button = UIButton(type: .system)
+		button.setTitle(title, for: .normal)
+		button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+		button.titleLabel?.adjustsFontSizeToFitWidth = true
+		button.titleLabel?.minimumScaleFactor = 0.7
+		button.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+		button.setTitleColor(.white, for: .normal)
+		button.layer.cornerRadius = 8
+		button.heightAnchor.constraint(equalToConstant: 40).isActive = true
+		button.addTarget(self, action: action, for: .touchUpInside)
+		return button
+	}
+
+	@objc func pasteFromClipboardTapped() {
+		guard let text = UIPasteboard.general.string, !text.isEmpty else { return }
+		CParsec.sendVirtualKeyboardText(text)
+	}
+
+	@objc func sendCopyShortcutTapped() {
+		CParsec.sendKeyChord(modifierKeyText: "CONTROL", keyText: "C")
+	}
+
+	@objc func sendCutShortcutTapped() {
+		CParsec.sendKeyChord(modifierKeyText: "CONTROL", keyText: "X")
+	}
+
+	@objc func sendPasteShortcutTapped() {
+		CParsec.sendKeyChord(modifierKeyText: "CONTROL", keyText: "V")
+	}
+
+	@objc func sendSelectAllTapped() {
+		CParsec.sendKeyChord(modifierKeyText: "CONTROL", keyText: "A")
+	}
+
+	@objc func sendCopyMacShortcutTapped() {
+		CParsec.sendKeyChord(modifierKeyText: "LGUI", keyText: "C")
+	}
+
+	@objc func sendPasteMacShortcutTapped() {
+		CParsec.sendKeyChord(modifierKeyText: "LGUI", keyText: "V")
 	}
 	
 	@objc func toolbarButtonClicked(_ sender: KeyBoardButton) {
