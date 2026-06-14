@@ -422,6 +422,33 @@ class ParsecSDKBridge: ParsecService
 		
 	}
 
+	func sendVirtualKeyboardText(_ text: String) {
+		for char in text {
+			sendVirtualKeyboardInput(text: String(char))
+		}
+	}
+
+	func sendKeyChord(modifierKeyText: String, keyText: String) {
+		guard let modifierKey = KeyCodeTranslators.parsecKeyCodeTranslator(modifierKeyText),
+			  let keyCode = KeyCodeTranslators.parsecKeyCodeTranslator(keyText.uppercased()) else {
+			return
+		}
+		var keyboardMessage = ParsecMessage()
+		keyboardMessage.type = MESSAGE_KEYBOARD
+		keyboardMessage.keyboard.pressed = true
+		keyboardMessage.keyboard.code = modifierKey
+		ParsecClientSendMessage(_parsec, &keyboardMessage)
+		keyboardMessage.keyboard.code = keyCode
+		ParsecClientSendMessage(_parsec, &keyboardMessage)
+		DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) {
+			keyboardMessage.keyboard.pressed = false
+			keyboardMessage.keyboard.code = keyCode
+			ParsecClientSendMessage(self._parsec, &keyboardMessage)
+			keyboardMessage.keyboard.code = modifierKey
+			ParsecClientSendMessage(self._parsec, &keyboardMessage)
+		}
+	}
+
 	func sendKeyboardMessage(event:KeyBoardKeyEvent)
 	{
 		if event.input == nil {

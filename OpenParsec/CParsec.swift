@@ -79,6 +79,8 @@ protocol ParsecService {
 	func sendKeyboardMessage(event: KeyBoardKeyEvent)
 	func sendVirtualKeyboardInput(text: String)
 	func sendVirtualKeyboardInput(text: String, isOn: Bool)
+	func sendVirtualKeyboardText(_ text: String)
+	func sendKeyChord(modifierKeyText: String, keyText: String)
 	func sendGameControllerButtonMessage(controllerId: UInt32, _ button: ParsecGamepadButton, pressed: Bool)
 	func sendGameControllerAxisMessage(controllerId: UInt32, _ button: ParsecGamepadAxis, _ value: Int16)
 	func sendGameControllerUnplugMessage(controllerId: UInt32)
@@ -194,6 +196,14 @@ class CParsec
 	
 	static func sendVirtualKeyboardInput(text: String, isOn: Bool) {
 		parsecImpl.sendVirtualKeyboardInput(text: text, isOn: isOn)
+	}
+
+	static func sendVirtualKeyboardText(_ text: String) {
+		parsecImpl.sendVirtualKeyboardText(text)
+	}
+
+	static func sendKeyChord(modifierKeyText: String, keyText: String) {
+		parsecImpl.sendKeyChord(modifierKeyText: modifierKeyText, keyText: keyText)
 	}
 	
 	static func sendGameControllerButtonMessage(controllerId:UInt32, _ button:ParsecGamepadButton, pressed:Bool)
