@@ -426,37 +426,21 @@ class ParsecSDKBridge: ParsecService
 		let chars = Array(text)
 		guard !chars.isEmpty else { return }
 
-		func sendNext(_ index: Int) {
-			guard index < chars.count else { return }
-			sendVirtualKeyboardInput(text: String(chars[index]))
-			DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.03) {
-				sendNext(index + 1)
+		for (index, char) in chars.enumerated() {
+			DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) { [weak self] in
+				self?.sendVirtualKeyboardInput(text: String(char))
 			}
 		}
-		sendNext(0)
 	}
 
 	func sendKeyChord(modifierKeyText: String, keyText: String) {
-		guard let modifierKey = KeyCodeTranslators.parsecKeyCodeTranslator(modifierKeyText),
-			  let keyCode = KeyCodeTranslators.parsecKeyCodeTranslator(keyText.uppercased()) else {
-			return
-		}
-
-		func sendPress(_ code: ParsecKeycode, _ pressed: Bool) {
-			var keyboardMessage = ParsecMessage()
-			keyboardMessage.type = MESSAGE_KEYBOARD
-			keyboardMessage.keyboard.pressed = pressed
-			keyboardMessage.keyboard.code = code
-			ParsecClientSendMessage(_parsec, &keyboardMessage)
-		}
-
-		sendPress(modifierKey, true)
-		DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.04) {
-			sendPress(keyCode, true)
-			DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.06) {
-				sendPress(keyCode, false)
-				DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.04) {
-					sendPress(modifierKey, false)
+		DispatchQueue.main.async { [weak self] in
+			guard let self else { return }
+			self.sendVirtualKeyboardInput(text: modifierKeyText, isOn: true)
+			DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+				self.sendVirtualKeyboardInput(text: keyText)
+				DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+					self.sendVirtualKeyboardInput(text: modifierKeyText, isOn: false)
 				}
 			}
 		}

@@ -12,20 +12,6 @@ struct SettingsHandler
 	public static var hideStatusBar:Bool = true
 	public static var rightClickPosition:RightClickPosition = .firstFinger
 	public static var clipboardBarVisible: Bool = true
-	public static var clipboardActionsEnabled: Set<String> = Set(ClipboardQuickActionId.allCases.map(\.rawValue))
-	
-	public static func isClipboardActionEnabled(_ action: ClipboardQuickActionId) -> Bool {
-		clipboardActionsEnabled.contains(action.rawValue)
-	}
-
-	public static func setClipboardActionEnabled(_ action: ClipboardQuickActionId, _ enabled: Bool) {
-		if enabled {
-			clipboardActionsEnabled.insert(action.rawValue)
-		} else {
-			clipboardActionsEnabled.remove(action.rawValue)
-		}
-	}
-	
 	public static func load()
 	{
 		//if UserDefaults.standard.exists(forKey:"renderer")
@@ -46,14 +32,6 @@ struct SettingsHandler
 		{ hideStatusBar = UserDefaults.standard.bool(forKey:"hideStatusBar") }
 		if UserDefaults.standard.exists(forKey:"clipboardBarVisible") {
 			clipboardBarVisible = UserDefaults.standard.bool(forKey: "clipboardBarVisible")
-		}
-		if UserDefaults.standard.exists(forKey:"clipboardActionsEnabled"),
-		   let saved = UserDefaults.standard.array(forKey:"clipboardActionsEnabled") as? [String] {
-			let valid = Set(ClipboardQuickActionId.allCases.map(\.rawValue))
-			clipboardActionsEnabled = Set(saved.filter { valid.contains($0) })
-			if clipboardActionsEnabled.isEmpty {
-				clipboardActionsEnabled = valid
-			}
 		}
 		
 		if UserDefaults.standard.exists(forKey:"resolution") {
@@ -78,7 +56,6 @@ struct SettingsHandler
 		UserDefaults.standard.set(resolution.desc, forKey:"resolution")
 		UserDefaults.standard.set(hideStatusBar, forKey: "hideStatusBar")
 		UserDefaults.standard.set(clipboardBarVisible, forKey: "clipboardBarVisible")
-		UserDefaults.standard.set(Array(clipboardActionsEnabled), forKey: "clipboardActionsEnabled")
 	}
 }
 

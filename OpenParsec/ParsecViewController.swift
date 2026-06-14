@@ -492,6 +492,8 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		let copyBarButton = createClipboardButton(displayText: "Copiar", action: #selector(sendCopyShortcutTapped))
 		let cutBarButton = createClipboardButton(displayText: "Cortar", action: #selector(sendCutShortcutTapped))
 		let pasteShortcutBarButton = createClipboardButton(displayText: "⌃V", action: #selector(sendPasteShortcutTapped))
+		let copyCtrlBarButton = createClipboardButton(displayText: "⌃C", action: #selector(sendCopyShortcutTapped))
+		let selectAllCtrlBarButton = createClipboardButton(displayText: "⌃A", action: #selector(sendSelectAllTapped))
 		let f1Button = createKeyboardButton(displayText: "F1", keyText: "F1", isToggleable: false)
 		let f2Button = createKeyboardButton(displayText: "F2", keyText: "F2", isToggleable: false)
 		let f3Button = createKeyboardButton(displayText: "F3", keyText: "F3", isToggleable: false)
@@ -511,7 +513,8 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		
 
 		let buttons = [windowsBarButton, escapeBarButton, tabBarButton, shiftBarButton, controlBarButton, altBarButton, deleteBarButton,
-					   selectAllBarButton, pasteBarButton, copyBarButton, cutBarButton, pasteShortcutBarButton,
+					   selectAllBarButton, pasteBarButton, copyBarButton, cutBarButton,
+					   selectAllCtrlBarButton, copyCtrlBarButton, pasteShortcutBarButton,
 					   f1Button, f2Button, f3Button, f4Button, f5Button, f6Button, f7Button, f8Button, f9Button, f10Button, f11Button, f12Button,
 								   upButton, downButton, leftButton, rightButton
 		]
@@ -646,6 +649,7 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 	func setupClipboardQuickBar() {
 		let container = UIView()
 		container.translatesAutoresizingMaskIntoConstraints = false
+		container.isUserInteractionEnabled = true
 		view.addSubview(container)
 
 		let blur = UIBlurEffect(style: .systemUltraThinMaterialDark)
@@ -653,18 +657,34 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		bar.translatesAutoresizingMaskIntoConstraints = false
 		bar.layer.cornerRadius = 12
 		bar.clipsToBounds = true
-		bar.alpha = 0
-		bar.isHidden = true
+		bar.isUserInteractionEnabled = true
 
 		let scrollView = UIScrollView()
 		scrollView.showsHorizontalScrollIndicator = false
 		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.delaysContentTouches = false
 
 		let stack = UIStackView()
 		stack.axis = .horizontal
 		stack.spacing = 8
 		stack.alignment = .center
 		stack.translatesAutoresizingMaskIntoConstraints = false
+
+		let shortcutItems: [(String, Selector)] = [
+			("Todo", #selector(sendSelectAllTapped)),
+			("Copiar", #selector(sendCopyShortcutTapped)),
+			("Pegar", #selector(pasteFromClipboardTapped)),
+			("Cortar", #selector(sendCutShortcutTapped)),
+			("⌃A", #selector(sendSelectAllTapped)),
+			("⌃C", #selector(sendCopyShortcutTapped)),
+			("⌃V", #selector(sendPasteShortcutTapped)),
+		]
+		for (title, action) in shortcutItems {
+			stack.addArrangedSubview(createQuickActionButton(title: title, action: action))
+		}
+
+		let hideButton = createQuickActionButton(title: "✕", action: #selector(hideClipboardBarTapped))
+		stack.addArrangedSubview(hideButton)
 
 		scrollView.addSubview(stack)
 		bar.contentView.addSubview(scrollView)
@@ -675,21 +695,24 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		toggle.backgroundColor = UIColor.black.withAlphaComponent(0.35)
 		toggle.layer.cornerRadius = 22
 		toggle.translatesAutoresizingMaskIntoConstraints = false
-		toggle.addTarget(self, action: #selector(toggleClipboardBarTapped), for: .touchUpInside)
+		toggle.addTarget(self, action: #selector(showClipboardBarTapped), for: .touchUpInside)
+		toggle.isHidden = SettingsHandler.clipboardBarVisible
 
 		container.addSubview(bar)
 		container.addSubview(toggle)
 
 		NSLayoutConstraint.activate([
-			container.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
-			container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+			container.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
+			container.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
+			container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+			bar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			bar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			bar.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+			bar.topAnchor.constraint(equalTo: container.topAnchor),
 			toggle.trailingAnchor.constraint(equalTo: container.trailingAnchor),
 			toggle.bottomAnchor.constraint(equalTo: container.bottomAnchor),
 			toggle.widthAnchor.constraint(equalToConstant: 44),
 			toggle.heightAnchor.constraint(equalToConstant: 44),
-			bar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-			bar.bottomAnchor.constraint(equalTo: toggle.topAnchor, constant: -8),
-			bar.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
 			scrollView.leadingAnchor.constraint(equalTo: bar.contentView.leadingAnchor, constant: 6),
 			scrollView.trailingAnchor.constraint(equalTo: bar.contentView.trailingAnchor, constant: -6),
 			scrollView.topAnchor.constraint(equalTo: bar.contentView.topAnchor, constant: 6),
@@ -706,8 +729,6 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		clipboardQuickBar = bar
 		clipboardButtonStack = stack
 		clipboardBarExpanded = SettingsHandler.clipboardBarVisible
-
-		rebuildClipboardButtons()
 		applyClipboardBarVisibility(animated: false)
 	}
 
@@ -716,24 +737,16 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 		applyClipboardBarVisibility(animated: true)
 	}
 
-	func rebuildClipboardButtons() {
-		guard let stack = clipboardButtonStack else { return }
-		stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-
-		let actions: [(ClipboardQuickActionId, Selector)] = [
-			(.selectAll, #selector(sendSelectAllTapped)),
-			(.copy, #selector(sendCopyShortcutTapped)),
-			(.paste, #selector(pasteFromClipboardTapped)),
-			(.cut, #selector(sendCutShortcutTapped)),
-		]
-		for (action, selector) in actions where SettingsHandler.isClipboardActionEnabled(action) {
-			stack.addArrangedSubview(createQuickActionButton(title: action.displayTitle, action: selector))
-		}
+	@objc func hideClipboardBarTapped() {
+		clipboardBarExpanded = false
+		SettingsHandler.clipboardBarVisible = false
+		SettingsHandler.save()
+		applyClipboardBarVisibility(animated: true)
 	}
 
-	@objc func toggleClipboardBarTapped() {
-		clipboardBarExpanded.toggle()
-		SettingsHandler.clipboardBarVisible = clipboardBarExpanded
+	@objc func showClipboardBarTapped() {
+		clipboardBarExpanded = true
+		SettingsHandler.clipboardBarVisible = true
 		SettingsHandler.save()
 		applyClipboardBarVisibility(animated: true)
 	}
@@ -741,28 +754,17 @@ extension ParsecViewController : UIKeyInput, UITextInputTraits {
 	func applyClipboardBarVisibility(animated: Bool) {
 		guard let bar = clipboardQuickBar, let toggle = clipboardToggleButton else { return }
 
-		let showBar = clipboardBarExpanded && (clipboardButtonStack?.arrangedSubviews.isEmpty == false)
+		let showBar = clipboardBarExpanded
 		let update = {
-			if showBar {
-				bar.isHidden = false
-				bar.alpha = 0.82
-				toggle.backgroundColor = UIColor.black.withAlphaComponent(0.55)
-			} else {
-				bar.alpha = 0
-				toggle.backgroundColor = UIColor.black.withAlphaComponent(0.35)
-			}
-		}
-		let finish = {
-			if !showBar {
-				bar.isHidden = true
-			}
+			bar.isHidden = !showBar
+			bar.alpha = showBar ? 0.88 : 0
+			toggle.isHidden = showBar
 		}
 
 		if animated {
-			UIView.animate(withDuration: 0.22, animations: update) { _ in finish() }
+			UIView.animate(withDuration: 0.2, animations: update)
 		} else {
 			update()
-			finish()
 		}
 	}
 
