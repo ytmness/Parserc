@@ -1,8 +1,11 @@
 # ParsecMobile (OpenParsec) — Codemagic iOS nativo (Swift)
 #
-# FIRMA: automatica via la integracion App Store Connect "PARSEC".
-# No usa referencias de Code signing identities (parsec_appstore no existe
-# en el equipo; las disponibles son de otras apps).
+# FIRMA: la integracion "PARSEC" crea o descarga el perfil en el script
+# (app-store-connect fetch-signing-files --create).
+# No uses ios_signing en environment: eso solo busca perfiles YA subidos
+# al equipo (somnus_app_store, workoutplanner_appstore) y falla con
+# "No matching profiles found".
+# Requiere CERTIFICATE_PRIVATE_KEY (Secret) en variables de la app.
 # Bundle: com.aigch.OpenParsec1.757NQ675N5
 #
 # IMPORTANTE: workflow "iOS → TestFlight (manual)" — NO Default Workflow.
@@ -10,9 +13,6 @@
 definitions:
   env_common: &env_common
     xcode: latest
-    ios_signing:
-      distribution_type: app_store
-      bundle_identifier: com.aigch.OpenParsec1.757NQ675N5
     vars:
       BUNDLE_ID: com.aigch.OpenParsec1.757NQ675N5
       XCODE_PROJECT: OpenParsec.xcodeproj
@@ -58,22 +58,38 @@ definitions:
     - name: iOS — code signing
       script: |
         set -e
+        if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+          echo "ERROR: falta CERTIFICATE_PRIVATE_KEY (Secret, sin grupo) en Codemagic."
+          echo "Pega la clave RSA de .local/ios_distribution_private_key, con BEGIN/END."
+          exit 1
+        fi
         keychain initialize
+        app-store-connect fetch-signing-files "$BUNDLE_ID" \
+          --type IOS_APP_STORE \
+          --create \
+          --strict-match-identifier
         keychain add-certificates
         cd "$CM_BUILD_DIR"
         xcode-project use-profiles --project OpenParsec.xcodeproj
+        CERT_NAME=$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Distribution:[^"]*\)"/\1/p' | head -1)
+        if [ -z "$CERT_NAME" ]; then
+          CERT_NAME=$(security find-identity -v -p codesigning | sed -n 's/.*"\(iPhone Distribution:[^"]*\)"/\1/p' | head -1)
+        fi
+        echo "Certificado: ${CERT_NAME:-ninguno}"
         echo "=== Signing (Release) ==="
         xcodebuild -project OpenParsec.xcodeproj -scheme OpenParsec -configuration Release \
           -destination 'generic/platform=iOS' -showBuildSettings 2>/dev/null \
           | grep -iE 'PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN|PROVISIONING|DEVELOPMENT_TEAM' || true
         FW="Frameworks/ParsecSDK.framework"
-        if [ -n "${CM_CERTIFICATE_NAME:-}" ] && [ -f "$FW/ParsecSDK" ]; then
-          echo "Firmando $FW con $CM_CERTIFICATE_NAME"
-          codesign --force --sign "$CM_CERTIFICATE_NAME" --timestamp=none "$FW"
+        if [ -n "$CERT_NAME" ] && [ -f "$FW/ParsecSDK" ]; then
+          echo "Firmando $FW con $CERT_NAME"
+          codesign --force --sign "$CERT_NAME" --timestamp=none "$FW"
           codesign -vv "$FW"
           echo "Arquitectura final embebida: $(lipo -info "$FW/ParsecSDK")"
         else
-          echo "WARN: CM_CERTIFICATE_NAME no definido"
+          echo "ERROR: no hay certificado Apple Distribution en el llavero"
+          security find-identity -v -p codesigning || true
+          exit 1
         fi
     - name: iOS — build number TestFlight
       script: |
@@ -194,9 +210,6 @@ workflows:
       app_store_connect: PARSEC
     environment:
       <<: *env_common
-      ios_signing:
-        distribution_type: ad_hoc
-        bundle_identifier: com.aigch.OpenParsec1.757NQ675N5
     scripts:
       - name: Repositorio — submódulos (ParsecSDK)
         script: |
@@ -205,6 +218,17 @@ workflows:
           test -d Frameworks/ParsecSDK.framework
       - name: iOS — code signing
         script: |
+          set -e
+          if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            echo "ERROR: falta CERTIFICATE_PRIVATE_KEY (Secret, sin grupo) en Codemagic."
+            exit 1
+          fi
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_ADHOC \
+            --create \
+            --strict-match-identifier
+          keychain add-certificates
           xcode-project use-profiles \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT"
       - name: iOS — compilar IPA ad hoc

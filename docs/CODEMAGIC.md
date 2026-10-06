@@ -146,6 +146,7 @@ Para IPA firmada necesitas certificados locales o usar Codemagic.
 | `integration PARSEC not found` | El nombre en Team integrations debe ser exactamente `PARSEC` |
 | `Variable group parcec not found` | El yaml ya no usa grupos; deja **Variable group** vacío al crear variables |
 | `Cannot save Signing Certificates without certificate private key` | Añade `CERTIFICATE_PRIVATE_KEY` (Secret) en Application environment variables |
+| `No matching profiles found` | No subas perfiles a Code signing identities. El yaml crea el perfil con `fetch-signing-files --create` y la integracion `PARSEC` |
 | `ParsecSDK.framework no encontrado` | `git submodule update --init --recursive` y commit del submódulo |
 | `Scheme OpenParsec not found` | Usa workflow YAML, no Default Workflow |
 | `APP_STORE_APPLE_ID` vacío | OK en primer build; añádelo después para auto-incrementar build |
@@ -160,6 +161,6 @@ Para IPA firmada necesitas certificados locales o usar Codemagic.
 - [ ] App ID `com.aigch.OpenParsec1` creado
 - [ ] App en App Store Connect creada (nombre **ParsecMobile**, Apple ID `6780047101`)
 - [ ] API Key (.p8) subida a Codemagic como integración **`PARSEC`**
-- [ ] Certificados/profiles: Codemagic con `ios_signing.distribution_type: app_store`
+- [ ] `CERTIFICATE_PRIVATE_KEY` en Codemagic (el script crea el perfil App Store; no hace falta subirlo a mano)
 - [ ] Icono 1024×1024 en `AppIcon.appiconset` (sin transparencia para App Store)
 - [ ] Tras subir IPA: activar TestFlight en ASC (export compliance, beta)
