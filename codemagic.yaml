@@ -1,10 +1,9 @@
 # ParsecMobile (OpenParsec) — Codemagic iOS nativo (Swift)
 #
-# FIRMA (obligatorio ANTES del primer build):
-#   Team settings → Code signing identities
-#   1. iOS certificates → Generate certificate → reference: parsec_distribution
-#   2. iOS provisioning profiles → reference: parsec_appstore (ya descargado)
-#      Bundle: com.aigch.OpenParsec1.757NQ675N5
+# FIRMA: automatica via la integracion App Store Connect "PARSEC".
+# No usa referencias de Code signing identities (parsec_appstore no existe
+# en el equipo; las disponibles son de otras apps).
+# Bundle: com.aigch.OpenParsec1.757NQ675N5
 #
 # IMPORTANTE: workflow "iOS → TestFlight (manual)" — NO Default Workflow.
 
@@ -12,10 +11,8 @@ definitions:
   env_common: &env_common
     xcode: latest
     ios_signing:
-      provisioning_profiles:
-        - profile: parsec_appstore
-      certificates:
-        - certificate: parsec_distribution
+      distribution_type: app_store
+      bundle_identifier: com.aigch.OpenParsec1.757NQ675N5
     vars:
       BUNDLE_ID: com.aigch.OpenParsec1.757NQ675N5
       XCODE_PROJECT: OpenParsec.xcodeproj
@@ -198,10 +195,8 @@ workflows:
     environment:
       <<: *env_common
       ios_signing:
-        provisioning_profiles:
-          - profile: parsec_appstore
-        certificates:
-          - certificate: parsec_distribution
+        distribution_type: ad_hoc
+        bundle_identifier: com.aigch.OpenParsec1.757NQ675N5
     scripts:
       - name: Repositorio — submódulos (ParsecSDK)
         script: |
