@@ -1,18 +1,23 @@
 # ParsecMobile (OpenParsec) — Codemagic iOS nativo (Swift)
 #
-# FIRMA: la integracion "PARSEC" crea o descarga el perfil en el script
-# (app-store-connect fetch-signing-files --create).
-# No uses ios_signing en environment: eso solo busca perfiles YA subidos
-# al equipo (somnus_app_store, workoutplanner_appstore) y falla con
-# "No matching profiles found".
-# Requiere CERTIFICATE_PRIVATE_KEY (Secret) en variables de la app.
-# Bundle: com.aigch.OpenParsec1.757NQ675N5
+# FIRMA: equipo Codemagic "ParsecMobile" (app Parserc), no el de Somnus.
+#   Integracion App Store Connect: PARSEC
+#   Certificado: parsec_distribution
+#   Perfil: parsec_appstore
+#   Bundle: com.aigch.OpenParsec1.757NQ675N5
+# Si el log dice que PARSEC o parsec_appstore no existen y lista
+# somnus_app_store / workoutplanner_appstore, el build se lanzo en otro equipo.
 #
 # IMPORTANTE: workflow "iOS → TestFlight (manual)" — NO Default Workflow.
 
 definitions:
   env_common: &env_common
     xcode: latest
+    ios_signing:
+      provisioning_profiles:
+        - profile: parsec_appstore
+      certificates:
+        - certificate: parsec_distribution
     vars:
       BUNDLE_ID: com.aigch.OpenParsec1.757NQ675N5
       XCODE_PROJECT: OpenParsec.xcodeproj
@@ -58,20 +63,14 @@ definitions:
     - name: iOS — code signing
       script: |
         set -e
-        if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
-          echo "ERROR: falta CERTIFICATE_PRIVATE_KEY (Secret, sin grupo) en Codemagic."
-          echo "Pega la clave RSA de .local/ios_distribution_private_key, con BEGIN/END."
-          exit 1
-        fi
         keychain initialize
-        app-store-connect fetch-signing-files "$BUNDLE_ID" \
-          --type IOS_APP_STORE \
-          --create \
-          --strict-match-identifier
         keychain add-certificates
         cd "$CM_BUILD_DIR"
         xcode-project use-profiles --project OpenParsec.xcodeproj
-        CERT_NAME=$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Distribution:[^"]*\)"/\1/p' | head -1)
+        CERT_NAME="${CM_CERTIFICATE_NAME:-}"
+        if [ -z "$CERT_NAME" ]; then
+          CERT_NAME=$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Distribution:[^"]*\)"/\1/p' | head -1)
+        fi
         if [ -z "$CERT_NAME" ]; then
           CERT_NAME=$(security find-identity -v -p codesigning | sed -n 's/.*"\(iPhone Distribution:[^"]*\)"/\1/p' | head -1)
         fi
@@ -219,15 +218,7 @@ workflows:
       - name: iOS — code signing
         script: |
           set -e
-          if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
-            echo "ERROR: falta CERTIFICATE_PRIVATE_KEY (Secret, sin grupo) en Codemagic."
-            exit 1
-          fi
           keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_ADHOC \
-            --create \
-            --strict-match-identifier
           keychain add-certificates
           xcode-project use-profiles \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT"
